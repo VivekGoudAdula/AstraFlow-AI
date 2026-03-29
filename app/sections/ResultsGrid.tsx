@@ -320,13 +320,20 @@ export default function ResultsGrid({
 
       {/* Export status message inline */}
       {exportStatus?.type === 'success' && (
-        <div className="flex items-center gap-2 text-sm text-green-700 bg-green-50 border border-green-200 rounded-lg p-3 mb-6">
-          <FaCheckCircle className="w-4 h-4 flex-shrink-0" />
-          <span>{exportStatus.message}</span>
+        <div className="bg-green-50 border border-green-200 rounded-lg p-4 mb-6">
+          <div className="flex items-center gap-2 text-sm text-green-700 mb-2">
+            <FaCheckCircle className="w-4 h-4 flex-shrink-0" />
+            <span className="font-medium">{exportStatus.message}</span>
+          </div>
           {exportStatus.url && (
-            <a href={exportStatus.url} target="_blank" rel="noopener noreferrer"
-              className="text-accent font-semibold underline underline-offset-2 hover:text-accent/80 transition-colors duration-200 ml-1">
-              Open Sheet
+            <a
+              href={exportStatus.url}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center gap-2 px-4 py-2 bg-primary text-primary-foreground rounded-lg text-sm font-medium hover:bg-primary/90 transition-all duration-200"
+            >
+              <FaExternalLinkAlt className="w-3.5 h-3.5" />
+              Click to View Results in Google Sheets
             </a>
           )}
         </div>

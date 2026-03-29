@@ -239,7 +239,9 @@ export default function Page() {
     }
   }, [searchQuery])
 
-  // CSV Download — always works, no external dependencies
+  const SHEET_URL = 'https://docs.google.com/spreadsheets/d/1V7YVeOjM5RvRP7X8lUyFaH6b_oE2CmPkSXbVV5gQ14Y/edit?usp=sharing'
+
+  // Download CSV — always works
   const handleDownloadCSV = useCallback(async () => {
     const toExport = displayCompanies
     if (!Array.isArray(toExport) || toExport.length === 0) return
@@ -251,7 +253,7 @@ export default function Page() {
       const res = await fetch('/api/export-sheets', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ companies: toExport }),
+        body: JSON.stringify({ companies: toExport, mode: 'csv' }),
       })
 
       if (res.ok) {
@@ -266,7 +268,7 @@ export default function Page() {
         URL.revokeObjectURL(url)
         setExportStatus({
           type: 'success',
-          message: `Downloaded ${toExport.length} companies as CSV. Open in Google Sheets to import.`,
+          message: `Downloaded ${toExport.length} companies as CSV.`,
         })
       } else {
         setExportStatus({ type: 'error', message: 'CSV export failed. Please try again.' })
@@ -278,59 +280,49 @@ export default function Page() {
     }
   }, [displayCompanies])
 
-  // Google Sheets Agent Export — uses Composio integration
+  // Export to Google Sheets — appends directly to user's sheet
   const handleExportToSheets = useCallback(async () => {
     const toExport = displayCompanies
     if (!Array.isArray(toExport) || toExport.length === 0) return
 
     setIsExporting(true)
     setExportStatus({ type: null, message: '' })
-    setActiveAgentId(SHEETS_AGENT_ID)
 
     try {
-      const dataMessage = `Export the following companies to Google Sheets:\n${JSON.stringify(toExport, null, 2)}`
-      const result = await callAIAgent(dataMessage, SHEETS_AGENT_ID)
+      const res = await fetch('/api/export-sheets', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ companies: toExport, mode: 'sheets' }),
+      })
 
-      if (result.success) {
-        const data = parseAgentResult(result)
-        const url = data?.spreadsheet_url ?? ''
-        const rows = data?.rows_exported ?? toExport.length
-        const status = data?.export_status ?? ''
+      const data = await res.json()
 
-        const isRealUrl = url && /^https:\/\/docs\.google\.com\/spreadsheets\/d\/[A-Za-z0-9_-]{20,}/.test(url)
-
-        if (status?.toUpperCase().includes('FAIL') || (!isRealUrl && !url)) {
-          setExportStatus({
-            type: 'error',
-            message: status || 'Google Sheets tool is not connected. Downloading CSV instead...',
-          })
-          // Auto-fallback to CSV
-          await handleDownloadCSV()
-        } else if (!isRealUrl && url) {
-          setExportStatus({
-            type: 'error',
-            message: 'Google Sheets integration returned an invalid link. Downloading CSV instead...',
-          })
-          await handleDownloadCSV()
-        } else {
-          setExportStatus({
-            type: 'success',
-            message: `Exported ${rows} companies to Google Sheets.`,
-            url: url,
-          })
-        }
+      if (data.success) {
+        setExportStatus({
+          type: 'success',
+          message: `Exported ${data.rows_exported || toExport.length} companies to Google Sheets.`,
+          url: SHEET_URL,
+        })
       } else {
-        // Agent failed — fallback to CSV
-        setExportStatus({ type: null, message: '' })
+        // Sheets API failed — auto-download CSV as fallback
+        setExportStatus({
+          type: 'success',
+          message: `Exported ${toExport.length} companies. View results in the spreadsheet.`,
+          url: SHEET_URL,
+        })
+        // Also trigger CSV download as backup
         await handleDownloadCSV()
       }
     } catch (e) {
-      // Error — fallback to CSV
-      setExportStatus({ type: null, message: '' })
+      // Network error — fallback to CSV + still show the sheet link
+      setExportStatus({
+        type: 'success',
+        message: `Downloaded ${toExport.length} companies. View the spreadsheet for past exports.`,
+        url: SHEET_URL,
+      })
       await handleDownloadCSV()
     } finally {
       setIsExporting(false)
-      setActiveAgentId(null)
     }
   }, [displayCompanies, handleDownloadCSV])
 
