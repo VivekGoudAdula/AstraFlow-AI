@@ -239,7 +239,47 @@ export default function Page() {
     }
   }, [searchQuery])
 
-  const handleExport = useCallback(async () => {
+  // CSV Download — always works, no external dependencies
+  const handleDownloadCSV = useCallback(async () => {
+    const toExport = displayCompanies
+    if (!Array.isArray(toExport) || toExport.length === 0) return
+
+    setIsExporting(true)
+    setExportStatus({ type: null, message: '' })
+
+    try {
+      const res = await fetch('/api/export-sheets', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ companies: toExport }),
+      })
+
+      if (res.ok) {
+        const blob = await res.blob()
+        const url = URL.createObjectURL(blob)
+        const a = document.createElement('a')
+        a.href = url
+        a.download = `AstraFlow_AI_Export_${new Date().toISOString().split('T')[0]}.csv`
+        document.body.appendChild(a)
+        a.click()
+        document.body.removeChild(a)
+        URL.revokeObjectURL(url)
+        setExportStatus({
+          type: 'success',
+          message: `Downloaded ${toExport.length} companies as CSV. Open in Google Sheets to import.`,
+        })
+      } else {
+        setExportStatus({ type: 'error', message: 'CSV export failed. Please try again.' })
+      }
+    } catch (e) {
+      setExportStatus({ type: 'error', message: e instanceof Error ? e.message : 'Export failed.' })
+    } finally {
+      setIsExporting(false)
+    }
+  }, [displayCompanies])
+
+  // Google Sheets Agent Export — uses Composio integration
+  const handleExportToSheets = useCallback(async () => {
     const toExport = displayCompanies
     if (!Array.isArray(toExport) || toExport.length === 0) return
 
@@ -257,36 +297,42 @@ export default function Page() {
         const rows = data?.rows_exported ?? toExport.length
         const status = data?.export_status ?? ''
 
-        // Validate the URL is a real Google Sheets link (not hallucinated)
         const isRealUrl = url && /^https:\/\/docs\.google\.com\/spreadsheets\/d\/[A-Za-z0-9_-]{20,}/.test(url)
 
         if (status?.toUpperCase().includes('FAIL') || (!isRealUrl && !url)) {
           setExportStatus({
             type: 'error',
-            message: status || 'Google Sheets tool is not connected. Please connect it in Lyzr Studio first.',
+            message: status || 'Google Sheets tool is not connected. Downloading CSV instead...',
           })
+          // Auto-fallback to CSV
+          await handleDownloadCSV()
         } else if (!isRealUrl && url) {
           setExportStatus({
             type: 'error',
-            message: 'Google Sheets integration is not connected. The export could not create a real spreadsheet. Please connect Google Sheets in Lyzr Studio.',
+            message: 'Google Sheets integration returned an invalid link. Downloading CSV instead...',
           })
+          await handleDownloadCSV()
         } else {
           setExportStatus({
             type: 'success',
-            message: `Exported ${rows} companies successfully.`,
+            message: `Exported ${rows} companies to Google Sheets.`,
             url: url,
           })
         }
       } else {
-        setExportStatus({ type: 'error', message: result?.error ?? 'Export failed. Please try again.' })
+        // Agent failed — fallback to CSV
+        setExportStatus({ type: null, message: '' })
+        await handleDownloadCSV()
       }
     } catch (e) {
-      setExportStatus({ type: 'error', message: e instanceof Error ? e.message : 'Export failed.' })
+      // Error — fallback to CSV
+      setExportStatus({ type: null, message: '' })
+      await handleDownloadCSV()
     } finally {
       setIsExporting(false)
       setActiveAgentId(null)
     }
-  }, [displayCompanies])
+  }, [displayCompanies, handleDownloadCSV])
 
   const handleToggleSample = useCallback((v: boolean) => {
     setShowSample(v)
@@ -345,7 +391,8 @@ export default function Page() {
             companies={displayCompanies}
             totalFound={totalFound}
             pipelineStatus={pipelineStatus}
-            onExport={handleExport}
+            onExportCSV={handleDownloadCSV}
+            onExportSheets={handleExportToSheets}
             isExporting={isExporting}
             exportStatus={exportStatus}
             qdrantSimilar={qdrantSimilar}

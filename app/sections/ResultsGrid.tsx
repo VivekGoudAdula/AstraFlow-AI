@@ -8,7 +8,7 @@ import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/component
 import {
   FaFire, FaExternalLinkAlt, FaLinkedin, FaEnvelope,
   FaChevronDown, FaChevronUp, FaFileExport, FaCheckCircle,
-  FaExclamationCircle, FaDatabase, FaLightbulb
+  FaExclamationCircle, FaDatabase, FaLightbulb, FaDownload
 } from 'react-icons/fa'
 import { Loader2 } from 'lucide-react'
 
@@ -41,7 +41,8 @@ interface ResultsGridProps {
   companies: Company[]
   totalFound: number
   pipelineStatus: string
-  onExport?: () => void
+  onExportCSV?: () => void
+  onExportSheets?: () => void
   isExporting?: boolean
   exportStatus?: { type: 'success' | 'error' | null; message: string; url?: string }
   qdrantSimilar?: Record<string, SimilarCompanyFromQdrant[]>
@@ -258,7 +259,7 @@ function CompanyCard({ company, qdrantMatches }: { company: Company; qdrantMatch
 
 export default function ResultsGrid({
   companies, totalFound, pipelineStatus,
-  onExport, isExporting, exportStatus,
+  onExportCSV, onExportSheets, isExporting, exportStatus,
   qdrantSimilar, qdrantStatus
 }: ResultsGridProps) {
   if (!Array.isArray(companies) || companies.length === 0) return null
@@ -273,19 +274,35 @@ export default function ResultsGrid({
             {pipelineStatus ? ` — ${pipelineStatus}` : ''}
           </p>
         </div>
-        {onExport && (
-          <Button
-            onClick={onExport}
-            disabled={isExporting}
-            className="bg-primary text-primary-foreground hover:bg-primary/90 rounded-lg font-medium tracking-wide transition-all duration-200"
-          >
-            {isExporting ? (
-              <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Exporting...</>
-            ) : (
-              <><FaFileExport className="mr-2 h-4 w-4" /> Export to Sheets</>
-            )}
-          </Button>
-        )}
+        <div className="flex items-center gap-2">
+          {onExportCSV && (
+            <Button
+              onClick={onExportCSV}
+              disabled={isExporting}
+              variant="outline"
+              className="rounded-lg font-medium tracking-wide transition-all duration-200 border-border"
+            >
+              {isExporting ? (
+                <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Exporting...</>
+              ) : (
+                <><FaDownload className="mr-2 h-4 w-4" /> Download CSV</>
+              )}
+            </Button>
+          )}
+          {onExportSheets && (
+            <Button
+              onClick={onExportSheets}
+              disabled={isExporting}
+              className="bg-primary text-primary-foreground hover:bg-primary/90 rounded-lg font-medium tracking-wide transition-all duration-200"
+            >
+              {isExporting ? (
+                <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Exporting...</>
+              ) : (
+                <><FaFileExport className="mr-2 h-4 w-4" /> Export to Sheets</>
+              )}
+            </Button>
+          )}
+        </div>
       </div>
 
       {/* Qdrant status indicator */}
