@@ -3,6 +3,7 @@
 import React, { useState } from 'react'
 import { Card, CardContent, CardHeader } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
+import { Button } from '@/components/ui/button'
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible'
 import { FaFire, FaExternalLinkAlt, FaLinkedin, FaEnvelope, FaChevronDown, FaChevronUp, FaFileExport, FaCheckCircle, FaExclamationCircle } from 'react-icons/fa'
 import { Loader2 } from 'lucide-react'
