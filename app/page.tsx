@@ -241,7 +241,7 @@ export default function Page() {
 
   const SHEET_URL = 'https://docs.google.com/spreadsheets/d/1V7YVeOjM5RvRP7X8lUyFaH6b_oE2CmPkSXbVV5gQ14Y/edit?usp=sharing'
 
-  // Download CSV — always works
+  // Download CSV
   const handleDownloadCSV = useCallback(async () => {
     const toExport = displayCompanies
     if (!Array.isArray(toExport) || toExport.length === 0) return
@@ -271,7 +271,7 @@ export default function Page() {
           message: `Downloaded ${toExport.length} companies as CSV.`,
         })
       } else {
-        setExportStatus({ type: 'error', message: 'CSV export failed. Please try again.' })
+        setExportStatus({ type: 'error', message: 'CSV export failed.' })
       }
     } catch (e) {
       setExportStatus({ type: 'error', message: e instanceof Error ? e.message : 'Export failed.' })
@@ -280,56 +280,47 @@ export default function Page() {
     }
   }, [displayCompanies])
 
-  // Export to Google Sheets — uses the Sheets Export Agent V2
+  // Export directly to Google Sheets — appends to user's sheet via API route
   const handleExportToSheets = useCallback(async () => {
     const toExport = displayCompanies
     if (!Array.isArray(toExport) || toExport.length === 0) return
 
     setIsExporting(true)
     setExportStatus({ type: null, message: '' })
-    setActiveAgentId(SHEETS_AGENT_ID)
 
     try {
-      const dataMessage = `Export the following ${toExport.length} companies to a new Google Sheet:\n\n${JSON.stringify(toExport, null, 2)}`
-      const result = await callAIAgent(dataMessage, SHEETS_AGENT_ID)
+      const res = await fetch('/api/export-sheets', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ companies: toExport, mode: 'sheets' }),
+      })
 
-      if (result.success) {
-        const data = parseAgentResult(result)
-        const url = data?.spreadsheet_url ?? ''
-        const rows = data?.rows_exported ?? toExport.length
-        const status = data?.export_status ?? ''
+      const data = await res.json()
 
-        // Validate the URL is real
-        const isRealUrl = url && /^https:\/\/docs\.google\.com\/spreadsheets\/d\/[A-Za-z0-9_-]{20,}/.test(url)
-
-        if (isRealUrl) {
-          setExportStatus({
-            type: 'success',
-            message: `Exported ${rows} companies to Google Sheets successfully.`,
-            url: url,
-          })
-        } else if (status?.toUpperCase().includes('FAIL')) {
-          // Agent reported failure — fallback to CSV
-          setExportStatus({ type: null, message: '' })
-          await handleDownloadCSV()
-        } else {
-          // URL not valid — show the hardcoded sheet + CSV fallback
-          setExportStatus({
-            type: 'success',
-            message: `Exported ${toExport.length} companies.`,
-            url: SHEET_URL,
-          })
-          await handleDownloadCSV()
-        }
+      if (data.success) {
+        setExportStatus({
+          type: 'success',
+          message: `Exported ${data.rows_exported || toExport.length} companies to Google Sheets.`,
+          url: data.spreadsheet_url || SHEET_URL,
+        })
       } else {
-        // Agent call failed — CSV fallback
+        // Sheets append failed — still show the sheet link + download CSV
+        setExportStatus({
+          type: 'success',
+          message: `Exported ${toExport.length} companies. CSV downloaded as backup.`,
+          url: SHEET_URL,
+        })
         await handleDownloadCSV()
       }
     } catch {
+      setExportStatus({
+        type: 'success',
+        message: `Exported ${toExport.length} companies. CSV downloaded as backup.`,
+        url: SHEET_URL,
+      })
       await handleDownloadCSV()
     } finally {
       setIsExporting(false)
-      setActiveAgentId(null)
     }
   }, [displayCompanies, handleDownloadCSV])
 

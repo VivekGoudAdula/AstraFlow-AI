@@ -3,14 +3,14 @@ import { NextRequest, NextResponse } from 'next/server'
 /**
  * Google Sheets Export API Route
  *
- * Appends company data directly to a Google Sheet using the Sheets API v4.
- * Uses a service account for authentication.
- * Also supports CSV download as fallback.
+ * Mode 'sheets': Appends company data directly to the user's Google Sheet
+ * Mode 'csv': Returns a downloadable CSV file
+ *
+ * Spreadsheet: https://docs.google.com/spreadsheets/d/1V7YVeOjM5RvRP7X8lUyFaH6b_oE2CmPkSXbVV5gQ14Y
  */
 
 const SPREADSHEET_ID = '1V7YVeOjM5RvRP7X8lUyFaH6b_oE2CmPkSXbVV5gQ14Y'
 const SHEET_URL = `https://docs.google.com/spreadsheets/d/${SPREADSHEET_ID}/edit?usp=sharing`
-const SHEETS_API_BASE = 'https://sheets.googleapis.com/v4/spreadsheets'
 
 interface CompanyData {
   company_name?: string
@@ -30,77 +30,8 @@ interface CompanyData {
   marketing_community_manager_email?: string
 }
 
-// --- Google Auth: Create JWT and get access token ---
-async function getAccessToken(): Promise<string | null> {
-  const serviceAccountKey = process.env.GOOGLE_SERVICE_ACCOUNT_KEY
-  if (!serviceAccountKey) return null
-
-  try {
-    const key = JSON.parse(serviceAccountKey)
-    const now = Math.floor(Date.now() / 1000)
-
-    // Build JWT header and claim set
-    const header = { alg: 'RS256', typ: 'JWT' }
-    const claimSet = {
-      iss: key.client_email,
-      scope: 'https://www.googleapis.com/auth/spreadsheets',
-      aud: 'https://oauth2.googleapis.com/token',
-      exp: now + 3600,
-      iat: now,
-    }
-
-    const encode = (obj: any) =>
-      Buffer.from(JSON.stringify(obj)).toString('base64url')
-
-    const unsignedToken = `${encode(header)}.${encode(claimSet)}`
-
-    // Sign with RSA private key
-    const crypto = await import('crypto')
-    const sign = crypto.createSign('RSA-SHA256')
-    sign.update(unsignedToken)
-    const signature = sign.sign(key.private_key, 'base64url')
-
-    const jwt = `${unsignedToken}.${signature}`
-
-    // Exchange JWT for access token
-    const tokenRes = await fetch('https://oauth2.googleapis.com/token', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-      body: `grant_type=urn:ietf:params:oauth:grant-type:jwt-bearer&assertion=${jwt}`,
-    })
-
-    if (!tokenRes.ok) return null
-    const tokenData = await tokenRes.json()
-    return tokenData.access_token || null
-  } catch {
-    return null
-  }
-}
-
-// --- Google API Key fallback ---
-function getApiKey(): string | null {
-  return process.env.GOOGLE_API_KEY || null
-}
-
-// --- Append rows to the sheet ---
-async function appendToSheet(companies: CompanyData[]): Promise<{ success: boolean; rowsAdded: number; error?: string }> {
-  const accessToken = await getAccessToken()
-  const apiKey = getApiKey()
-
-  if (!accessToken && !apiKey) {
-    return { success: false, rowsAdded: 0, error: 'No Google credentials configured' }
-  }
-
-  // Build headers row + data rows
-  const headers = [
-    'Company Name', 'Funding Total', 'Latest Funding', 'Date Founded',
-    'Funding Score', 'Score Breakdown', 'Category', 'Why This Matters',
-    'Trending', 'Similar Companies', 'Source of Proof',
-    'Founder LinkedIn', 'Email', 'Marketing Manager LinkedIn', 'Marketing Manager Email',
-    'Export Date',
-  ]
-
-  const dataRows = companies.map((c) => [
+function companyToRow(c: CompanyData): string[] {
+  return [
     c.company_name || 'N/A',
     c.funding_total || 'N/A',
     c.latest_funding || 'N/A',
@@ -116,105 +47,120 @@ async function appendToSheet(companies: CompanyData[]): Promise<{ success: boole
     c.email || 'N/A',
     c.marketing_community_manager_linkedin || 'N/A',
     c.marketing_community_manager_email || 'N/A',
-    new Date().toISOString(),
-  ])
+    new Date().toLocaleString(),
+  ]
+}
 
-  // First check if sheet has headers, if not add them
-  const allRows = [headers, ...dataRows]
+const HEADERS = [
+  'Company Name', 'Funding Total', 'Latest Funding', 'Date Founded',
+  'Funding Score', 'Score Breakdown', 'Category', 'Why This Matters',
+  'Trending', 'Similar Companies', 'Source of Proof',
+  'Founder LinkedIn', 'Email', 'Marketing Mgr LinkedIn', 'Marketing Mgr Email',
+  'Export Date',
+]
 
-  const url = accessToken
-    ? `${SHEETS_API_BASE}/${SPREADSHEET_ID}/values/Sheet1!A1:append?valueInputOption=USER_ENTERED&insertDataOption=INSERT_ROWS`
-    : `${SHEETS_API_BASE}/${SPREADSHEET_ID}/values/Sheet1!A1:append?valueInputOption=USER_ENTERED&insertDataOption=INSERT_ROWS&key=${apiKey}`
-
-  const fetchHeaders: Record<string, string> = {
-    'Content-Type': 'application/json',
+// --- Google Sheets API: Append using service account ---
+async function getAccessToken(): Promise<string | null> {
+  const raw = process.env.GOOGLE_SERVICE_ACCOUNT_KEY
+  if (!raw) return null
+  try {
+    const key = JSON.parse(raw)
+    const now = Math.floor(Date.now() / 1000)
+    const header = { alg: 'RS256', typ: 'JWT' }
+    const claims = {
+      iss: key.client_email,
+      scope: 'https://www.googleapis.com/auth/spreadsheets',
+      aud: 'https://oauth2.googleapis.com/token',
+      exp: now + 3600,
+      iat: now,
+    }
+    const b64 = (o: any) => Buffer.from(JSON.stringify(o)).toString('base64url')
+    const unsigned = `${b64(header)}.${b64(claims)}`
+    const crypto = await import('crypto')
+    const sig = crypto.createSign('RSA-SHA256')
+    sig.update(unsigned)
+    const signed = sig.sign(key.private_key, 'base64url')
+    const jwt = `${unsigned}.${signed}`
+    const res = await fetch('https://oauth2.googleapis.com/token', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: `grant_type=urn:ietf:params:oauth:grant-type:jwt-bearer&assertion=${jwt}`,
+    })
+    if (!res.ok) return null
+    const data = await res.json()
+    return data.access_token || null
+  } catch {
+    return null
   }
-  if (accessToken) {
-    fetchHeaders['Authorization'] = `Bearer ${accessToken}`
+}
+
+async function appendToGoogleSheets(companies: CompanyData[]): Promise<{ success: boolean; rowsAdded: number; error?: string }> {
+  // Try service account first
+  let token = await getAccessToken()
+
+  // Try API key as fallback
+  const apiKey = process.env.GOOGLE_API_KEY || process.env.GOOGLE_SHEETS_API_KEY || ''
+
+  if (!token && !apiKey) {
+    return { success: false, rowsAdded: 0, error: 'No Google credentials. Set GOOGLE_SERVICE_ACCOUNT_KEY or GOOGLE_API_KEY env var.' }
   }
+
+  const rows = [HEADERS, ...companies.map(companyToRow)]
+  const range = 'Sheet1'
+  const baseUrl = `https://sheets.googleapis.com/v4/spreadsheets/${SPREADSHEET_ID}/values/${range}:append`
+  const params = 'valueInputOption=USER_ENTERED&insertDataOption=INSERT_ROWS'
+
+  const url = token
+    ? `${baseUrl}?${params}`
+    : `${baseUrl}?${params}&key=${apiKey}`
+
+  const headers: Record<string, string> = { 'Content-Type': 'application/json' }
+  if (token) headers['Authorization'] = `Bearer ${token}`
 
   try {
     const res = await fetch(url, {
       method: 'POST',
-      headers: fetchHeaders,
-      body: JSON.stringify({
-        values: allRows,
-      }),
+      headers,
+      body: JSON.stringify({ values: rows }),
     })
 
     if (res.ok) {
       const data = await res.json()
-      return {
-        success: true,
-        rowsAdded: data?.updates?.updatedRows || companies.length,
-      }
+      return { success: true, rowsAdded: data?.updates?.updatedRows || companies.length }
     }
 
-    const errorData = await res.json().catch(() => ({}))
-    return {
-      success: false,
-      rowsAdded: 0,
-      error: errorData?.error?.message || `API error ${res.status}`,
-    }
-  } catch (err) {
-    return {
-      success: false,
-      rowsAdded: 0,
-      error: err instanceof Error ? err.message : 'Network error',
-    }
+    const err = await res.json().catch(() => ({}))
+    return { success: false, rowsAdded: 0, error: `Sheets API ${res.status}: ${err?.error?.message || 'Unknown error'}` }
+  } catch (e) {
+    return { success: false, rowsAdded: 0, error: e instanceof Error ? e.message : 'Network error' }
   }
 }
 
-// --- CSV generation fallback ---
-function escapeCSV(value: string): string {
-  if (!value) return ''
-  const escaped = value.replace(/"/g, '""')
-  if (escaped.includes(',') || escaped.includes('\n') || escaped.includes('"')) {
-    return `"${escaped}"`
-  }
-  return escaped
+// --- CSV ---
+function escapeCSV(v: string): string {
+  if (!v) return ''
+  const e = v.replace(/"/g, '""')
+  return e.includes(',') || e.includes('\n') || e.includes('"') ? `"${e}"` : e
 }
 
 function generateCSV(companies: CompanyData[]): string {
-  const headers = [
-    'Company Name', 'Funding Total', 'Latest Funding', 'Date Founded',
-    'Funding Score', 'Score Breakdown', 'Category', 'Why This Matters',
-    'Trending', 'Similar Companies', 'Source of Proof',
-    'Founder LinkedIn', 'Email', 'Marketing Manager LinkedIn', 'Marketing Manager Email',
-  ]
-
-  const rows = companies.map((c) => [
-    escapeCSV(c.company_name || 'N/A'),
-    escapeCSV(c.funding_total || 'N/A'),
-    escapeCSV(c.latest_funding || 'N/A'),
-    escapeCSV(c.date_founded || 'N/A'),
-    String(c.funding_score ?? 0),
-    escapeCSV(c.score_breakdown || 'N/A'),
-    escapeCSV(c.category_tag || 'N/A'),
-    escapeCSV(c.why_this_matters || 'N/A'),
-    c.trending_flag ? 'Yes' : 'No',
-    escapeCSV(Array.isArray(c.similar_companies) ? c.similar_companies.join(', ') : 'N/A'),
-    escapeCSV(c.source_of_proof || 'N/A'),
-    escapeCSV(c.founder_linkedin || 'N/A'),
-    escapeCSV(c.email || 'N/A'),
-    escapeCSV(c.marketing_community_manager_linkedin || 'N/A'),
-    escapeCSV(c.marketing_community_manager_email || 'N/A'),
-  ])
-
-  return [headers.join(','), ...rows.map((r) => r.join(','))].join('\n')
+  const headerRow = HEADERS.join(',')
+  const dataRows = companies.map(c =>
+    companyToRow(c).map(v => escapeCSV(v)).join(',')
+  )
+  return [headerRow, ...dataRows].join('\n')
 }
 
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json()
     const companies: CompanyData[] = Array.isArray(body?.companies) ? body.companies : []
-    const mode = body?.mode || 'sheets' // 'sheets' or 'csv'
+    const mode = body?.mode || 'sheets'
 
     if (companies.length === 0) {
       return NextResponse.json({ error: 'No companies to export' }, { status: 400 })
     }
 
-    // Mode: CSV download
     if (mode === 'csv') {
       const csv = generateCSV(companies)
       return new NextResponse(csv, {
@@ -226,29 +172,23 @@ export async function POST(req: NextRequest) {
       })
     }
 
-    // Mode: Google Sheets append
-    const result = await appendToSheet(companies)
+    // Mode: sheets — append directly
+    const result = await appendToGoogleSheets(companies)
 
-    if (result.success) {
-      return NextResponse.json({
-        success: true,
-        spreadsheet_url: SHEET_URL,
-        rows_exported: result.rowsAdded,
-        message: `Successfully exported ${result.rowsAdded} rows to Google Sheets`,
-      })
-    }
-
-    // Sheets failed — return error with CSV fallback hint
     return NextResponse.json({
-      success: false,
-      error: result.error,
+      success: result.success,
       spreadsheet_url: SHEET_URL,
-      message: 'Google Sheets API failed. Use CSV download instead.',
+      rows_exported: result.rowsAdded,
+      message: result.success
+        ? `Exported ${result.rowsAdded} rows to Google Sheets`
+        : `Export failed: ${result.error}. Use CSV download instead.`,
+      error: result.error || undefined,
     })
   } catch (error) {
-    return NextResponse.json(
-      { success: false, error: error instanceof Error ? error.message : 'Export failed' },
-      { status: 500 }
-    )
+    return NextResponse.json({
+      success: false,
+      spreadsheet_url: SHEET_URL,
+      error: error instanceof Error ? error.message : 'Export failed',
+    }, { status: 500 })
   }
 }
