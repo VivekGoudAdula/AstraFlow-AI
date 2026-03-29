@@ -218,12 +218,29 @@ export default function Page() {
         const data = parseAgentResult(result)
         const url = data?.spreadsheet_url ?? ''
         const rows = data?.rows_exported ?? toExport.length
-        const status = data?.export_status ?? 'success'
-        setExportStatus({
-          type: 'success',
-          message: `Exported ${rows} rows. Status: ${status}`,
-          url: url || undefined,
-        })
+        const status = data?.export_status ?? ''
+
+        // Validate the URL is a real Google Sheets link (not hallucinated)
+        const isRealUrl = url && /^https:\/\/docs\.google\.com\/spreadsheets\/d\/[A-Za-z0-9_-]{20,}/.test(url)
+
+        if (status?.toUpperCase().includes('FAIL') || (!isRealUrl && !url)) {
+          setExportStatus({
+            type: 'error',
+            message: status || 'Google Sheets tool is not connected. Please connect it in Lyzr Studio first.',
+          })
+        } else if (!isRealUrl && url) {
+          // Agent returned a fake URL
+          setExportStatus({
+            type: 'error',
+            message: 'Google Sheets integration is not connected. The export could not create a real spreadsheet. Please connect Google Sheets in Lyzr Studio.',
+          })
+        } else {
+          setExportStatus({
+            type: 'success',
+            message: `Exported ${rows} companies successfully.`,
+            url: url,
+          })
+        }
       } else {
         setExportStatus({ type: 'error', message: result?.error ?? 'Export failed. Please try again.' })
       }
