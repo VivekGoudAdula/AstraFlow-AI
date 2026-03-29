@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react'
 import ErrorBoundary from '@/components/ErrorBoundary'
 import { AgentInterceptorProvider } from '@/components/AgentInterceptorProvider'
 import { HydrationGuard } from '@/components/HydrationGuard'
+import { Toaster } from 'sonner'
 
 export default function ClientProviders({ children }: { children: React.ReactNode }) {
   const [mounted, setMounted] = useState(false)
@@ -14,6 +15,7 @@ export default function ClientProviders({ children }: { children: React.ReactNod
 
   return (
     <ErrorBoundary>
+      <Toaster position="top-right" richColors />
       <AgentInterceptorProvider>
         <HydrationGuard>
           {children}

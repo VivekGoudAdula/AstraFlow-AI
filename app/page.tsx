@@ -11,6 +11,7 @@ import ResultsGrid from './sections/ResultsGrid'
 import MarketPatterns from './sections/MarketPatterns'
 import type { Company } from './sections/ResultsGrid'
 import { Badge } from '@/components/ui/badge'
+import { toast } from 'sonner'
 
 // --- Theme ---
 const THEME_VARS = {
@@ -35,7 +36,6 @@ const THEME_VARS = {
 
 // --- Agent IDs ---
 const COORDINATOR_AGENT_ID = '69c8e2962233a0528b6d6110'
-const SHEETS_AGENT_ID = '69c90718f9a273089e123be7' // Sheets Export Agent V2 — clean tool config
 
 // --- Sample Data ---
 const SAMPLE_COMPANIES: Company[] = [
@@ -125,6 +125,76 @@ function extractCompanies(data: any): Company[] {
   return []
 }
 
+// --- Helper: Validate LinkedIn URLs ---
+function isValidLinkedIn(url: string): boolean {
+  if (!url || url === 'Not specified') return false
+  return url.includes('linkedin.com/in/')
+}
+
+// --- Helper: Normalize funding strings ---
+function normalizeFunding(value: string): string {
+  if (!value) return 'Not specified'
+  return value.replace(/\(.*?\)/g, '').trim()
+}
+
+// --- Helper: Robust Source Cleaner (Anti-Corruption) ---
+function fixSourceUrls(source: any): string[] {
+  if (!source || source === 'Not specified') return []
+  
+  // Handled array case directly
+  if (Array.isArray(source)) {
+    return source.length > 0 ? [String(source[0]).trim()] : []
+  }
+
+  const str = String(source).trim()
+
+  // If the agent returned a stringified JSON array
+  if (str.startsWith('[') && str.endsWith(']')) {
+    try {
+      const parsed = JSON.parse(str)
+      if (Array.isArray(parsed) && parsed.length > 0) {
+        return [String(parsed[0]).trim()]
+      }
+    } catch {
+      // fallback if parse fails
+    }
+  }
+
+  // If it's just a raw comma-separated list, take the first item
+  const parts = str.split(',').map(s => s.trim()).filter(Boolean)
+  if (parts.length > 0) {
+    // simple removal of rogue quotes that break hrefs
+    return [parts[0].replace(/^["']+|["']+$/g, '')]
+  }
+
+  return [str.replace(/^["']+|["']+$/g, '')]
+}
+
+// --- Helper: LinkedIn Discovery via server-side route (name OR company-only Google search) ---
+async function findLinkedInWithApify(name: string, company: string): Promise<string> {
+  if (!company || company.length < 2) return 'Not specified'
+  const cleanName = (name && name !== 'Not specified' && name.length >= 2) ? name : ''
+  try {
+    console.log(`🔍 [Apify Discovery] name="${cleanName || 'NONE'}" company="${company}"`)
+    const res = await fetch('/api/linkedin', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name: cleanName, company }),
+    })
+    const data = await res.json()
+    const url = data?.profileUrl || ''
+    if (url && url.includes('linkedin.com/in/')) {
+      console.log(`✅ [Apify Discovery] Found: ${url}`)
+      return url
+    }
+    console.log(`⚠️ [Apify Discovery] No profile for: "${company}"`)
+    return 'Not specified'
+  } catch (err) {
+    console.error('❌ [Apify Discovery] Error:', err)
+    return 'Not specified'
+  }
+}
+
 // --- Error Boundary ---
 class ErrorBoundary extends React.Component<
   { children: React.ReactNode },
@@ -191,32 +261,168 @@ export default function Page() {
     const stepTimer1 = setTimeout(() => setLoadingStep('Extracting company details...'), 8000)
     const stepTimer2 = setTimeout(() => setLoadingStep('Enriching funding profiles...'), 18000)
 
+    const promptInstructions = `
+Identify recently funded AI companies for: "${searchQuery}".
+Return ONLY high-quality results with LIVE, VERIFIED links.
+
+CRITICAL INSTRUCTION: DO NOT USE techcrunch.com AS A SOURCE. Their links are blocked/failing. Use alternative sources ONLY (e.g. Crunchbase, Bloomberg, PR Newswire, VentureBeat, company blogs, or official press releases).
+
+-------------------------
+STRICT HUMAN-CENTRIC EXTRACTION (MANDATORY)
+-------------------------
+1. FOUNDER IDENTITY: You MUST identify the REAL FULL NAME of the Founder/CEO. 
+   - Check Crunchbase, LinkedIn (Company Page), or general News.
+   - Key to use: "founder_name"
+2. MARKETING IDENTITY: Identify the REAL FULL NAME of the Head of Growth or Marketing.
+   - Key to use: "marketing_manager_name"
+3. NO GUESSING: DO NOT generate LinkedIn URLs. ONLY return the REAL Names.
+4. SOURCE ENTITY: "source_of_proof" MUST be an ARRAY of valid URLs (EXCLUDING techcrunch).
+
+EXAMPLE OUTPUT:
+{
+  "companies": [
+    {
+      "company_name": "OpenAI",
+      "founder_name": "Sam Altman",
+      "marketing_manager_name": "Not specified",
+      "email": "Not specified",
+      "date_founded": "2015",
+      "funding_total": "$11B+",
+      "latest_funding": "$6.6B led by Thrive Capital, Oct 2024",
+      "source_of_proof": ["https://www.bloomberg.com/news/articles/2024-10-02/openai-funding-round", "https://news.crunchbase.com/ai/openai-funding/"]
+    }
+  ],
+  "total_companies_found": 3,
+  "pipeline_status": "Human Intelligence Scan"
+}
+Return ONLY JSON.
+`
+
+
     try {
-      const result = await callAIAgent(searchQuery, COORDINATOR_AGENT_ID)
+      console.log('🚀 [Scout Engine] Starting Scan for:', searchQuery)
+      const result = await callAIAgent(promptInstructions, COORDINATOR_AGENT_ID)
+      
+      const rawCount = result?.response?.result?.length || 0
+      console.log('📥 [Scout Engine] Agent Result received:', { success: result.success, rawCount })
+
       clearTimeout(stepTimer1)
       clearTimeout(stepTimer2)
 
       if (result.success) {
         const data = parseAgentResult(result)
-        const extracted = extractCompanies(data)
-        setCompanies(extracted)
-        setTotalFound(data?.total_companies_found ?? extracted.length)
-        setPipelineStatus(data?.pipeline_status ?? 'Complete')
+        console.log('🧩 [Scout Engine] Parsed Data:', data)
+
+        let extracted = extractCompanies(data)
+        
+        // 🧪 Multi-key Name Extraction (check all possible field variants)
+        extracted = extracted.map(c => {
+          // Check ALL possible field name variants the agent might use
+          const fName: string = (
+            c.founder_name || 
+            c.founder || 
+            c.ceo_name || 
+            c.ceo || 
+            c.founder_ceo ||
+            c.founders ||
+            ''
+          ).trim()
+
+          const mName: string = (
+            c.marketing_manager_name || 
+            c.marketing_manager ||
+            c.head_of_marketing ||
+            c.growth_lead ||
+            ''
+          ).trim()
+
+          // Validate: reject placeholder values
+          const cleanName = (n: string) => {
+            if (!n || n === 'Not specified' || n.toLowerCase() === 'not specified') return ''
+            return n
+          }
+
+          return { ...c, founder_name: cleanName(fName), marketing_manager_name: cleanName(mName) }
+        })
+
+        console.log(`📋 [Scout Engine] Processing ${extracted.length} companies. Founder names: ${extracted.map(c => `"${c.founder_name || 'NONE'}"`).join(', ')}`)
+
+
+        extracted = extracted.map(c => ({
+          ...c,
+          founder_linkedin: isValidLinkedIn(c.founder_linkedin || '') ? c.founder_linkedin : 'Not specified',
+          marketing_community_manager_linkedin: isValidLinkedIn(c.marketing_community_manager_linkedin || '') ? c.marketing_community_manager_linkedin : 'Not specified',
+          funding_total: normalizeFunding(c.funding_total || ''),
+          email: (c.email && c.email.includes('@')) ? c.email : 'Not specified',
+          source_of_proof: fixSourceUrls(c.source_of_proof) 
+        }))
+
+        // 🥇 STEP 2.5 — ENRICHMENT (Apify LinkedIn Resolution)
+        setLoadingStep('Resolving professional profiles...')
+        console.log('⚡ [Scout Engine] Starting Apify Loop...')
+
+        const enriched: Company[] = await Promise.all(extracted.map(async (c: Company) => {
+          let f_linkedin = c.founder_linkedin
+          let m_linkedin = c.marketing_community_manager_linkedin
+
+          // Always try to resolve founder — even if name is empty, the server route will try
+          if (!isValidLinkedIn(f_linkedin || '')) {
+            const nameToSearch = c.founder_name && c.founder_name !== 'Not specified' ? c.founder_name : ''
+            console.log(`🔎 [Scout Engine] Resolving Founder for "${c.company_name}" with name: "${nameToSearch || 'UNKNOWN'}"`)
+            f_linkedin = await findLinkedInWithApify(nameToSearch, c.company_name || '')
+          }
+
+          if (!isValidLinkedIn(m_linkedin || '') && c.marketing_manager_name && c.marketing_manager_name !== 'Not specified') {
+            console.log(`🔎 [Scout Engine] Resolving Marketing for "${c.company_name}": "${c.marketing_manager_name}"`)
+            m_linkedin = await findLinkedInWithApify(c.marketing_manager_name, c.company_name || '')
+          }
+
+          return {
+            ...c,
+            founder_linkedin: f_linkedin,
+            marketing_community_manager_linkedin: m_linkedin
+          }
+        }))
+
+        console.log('✨ [Scout Engine] Final Enriched Results:', enriched)
+
+        // 🥉 STEP 3 — SMART QUALITY FILTER (High Integrity)
+        const highIntegrityCompanies = enriched.filter(c => {
+          const hasName = !!c.company_name && c.company_name !== 'Not specified'
+          const hasSource = !!c.source_of_proof && c.source_of_proof.length > 0
+          return hasName && hasSource
+        })
+
+        if (highIntegrityCompanies.length === 0 && rawCount > 0) {
+          toast.warning("Verification failed for all companies. Showing raw data instead.")
+          setCompanies(enriched)
+          setTotalFound(rawCount)
+        } else {
+          setCompanies(highIntegrityCompanies)
+          setTotalFound(highIntegrityCompanies.length)
+        }
+
+        setPipelineStatus(data?.pipeline_status ?? 'Deep Scan Complete')
 
         // After getting companies, store in Qdrant and find similar (async, non-blocking)
-        if (extracted.length > 0) {
+        const toStore = highIntegrityCompanies.length > 0 ? highIntegrityCompanies : extracted
+        if (toStore.length > 0) {
           setLoadingStep('Querying vector memory...')
           try {
             const qdrantResult = await storeAndFindSimilar(
-              extracted.map(c => ({
-                company_name: c.company_name || '',
-                funding_total: c.funding_total || '',
-                latest_funding: c.latest_funding || '',
-                category_tag: c.category_tag || '',
+              toStore.map(c => ({
+                company_name: c.company_name || 'Not specified',
+                funding_total: c.funding_total || 'Not specified',
+                latest_funding: c.latest_funding || 'Not specified',
+                category_tag: c.category_tag || 'AI Tools',
                 funding_score: c.funding_score || 0,
-                why_this_matters: c.why_this_matters || '',
-                date_founded: c.date_founded || '',
-                source_of_proof: c.source_of_proof || '',
+                why_this_matters: c.why_this_matters || 'No additional insight provided',
+                date_founded: c.date_founded || 'Not specified',
+                source_of_proof: Array.isArray(c.source_of_proof) ? c.source_of_proof.join(', ') : (c.source_of_proof || 'Not specified'),
+                founder_linkedin: c.founder_linkedin || 'Not specified',
+                email: c.email || 'Not specified',
+                marketing_community_manager_linkedin: c.marketing_community_manager_linkedin || 'Not specified',
+                marketing_community_manager_email: c.marketing_community_manager_email || 'Not specified',
                 trending_flag: c.trending_flag || false,
               }))
             )
@@ -280,49 +486,46 @@ export default function Page() {
     }
   }, [displayCompanies])
 
-  // Export directly to Google Sheets — appends to user's sheet via API route
+  // Export directly to Google Sheets — creates a NEW sheet via /api/export
   const handleExportToSheets = useCallback(async () => {
     const toExport = displayCompanies
     if (!Array.isArray(toExport) || toExport.length === 0) return
 
     setIsExporting(true)
     setExportStatus({ type: null, message: '' })
+    const toastId = toast.loading('Creating your Google Sheet...')
 
     try {
-      const res = await fetch('/api/export-sheets', {
+      const res = await fetch('/api/export', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ companies: toExport, mode: 'sheets' }),
+        body: JSON.stringify({ companies: toExport }),
       })
 
       const data = await res.json()
 
-      if (data.success) {
+      if (data.success && data.url) {
         setExportStatus({
           type: 'success',
-          message: `Exported ${data.rows_exported || toExport.length} companies to Google Sheets.`,
-          url: data.spreadsheet_url || SHEET_URL,
+          message: `Google Sheet created successfully with ${toExport.length} companies.`,
+          url: data.url,
         })
+        toast.success('Google Sheet created successfully', { id: toastId })
+        // Open the sheet in a new tab as requested
+        window.open(data.url, "_blank")
       } else {
-        // Sheets append failed — still show the sheet link + download CSV
-        setExportStatus({
-          type: 'success',
-          message: `Exported ${toExport.length} companies. CSV downloaded as backup.`,
-          url: SHEET_URL,
-        })
-        await handleDownloadCSV()
+        const errorMsg = data.error || 'Google Sheets export failed.'
+        setExportStatus({ type: 'error', message: errorMsg })
+        toast.error(errorMsg, { id: toastId })
       }
-    } catch {
-      setExportStatus({
-        type: 'success',
-        message: `Exported ${toExport.length} companies. CSV downloaded as backup.`,
-        url: SHEET_URL,
-      })
-      await handleDownloadCSV()
+    } catch (e) {
+      const errorMsg = e instanceof Error ? e.message : 'Export failed.'
+      setExportStatus({ type: 'error', message: errorMsg })
+      toast.error(errorMsg, { id: toastId })
     } finally {
       setIsExporting(false)
     }
-  }, [displayCompanies, handleDownloadCSV])
+  }, [displayCompanies])
 
   const handleToggleSample = useCallback((v: boolean) => {
     setShowSample(v)
@@ -404,12 +607,11 @@ export default function Page() {
                 {activeAgentId === COORDINATOR_AGENT_ID && <Badge variant="secondary" className="text-xs flex-shrink-0">Active</Badge>}
               </div>
               <div className="flex items-center gap-3">
-                <div className={`w-2.5 h-2.5 rounded-full flex-shrink-0 ${activeAgentId === SHEETS_AGENT_ID ? 'bg-green-500 animate-pulse' : 'bg-muted-foreground/40'}`} />
+                <div className="w-2.5 h-2.5 rounded-full flex-shrink-0 bg-muted-foreground/40" />
                 <div className="min-w-0">
-                  <p className="text-sm font-medium text-foreground">Sheets Export Agent</p>
-                  <p className="text-xs text-muted-foreground">Exports company data to Google Sheets</p>
+                  <p className="text-sm font-medium text-foreground">Google Cloud API</p>
+                  <p className="text-xs text-muted-foreground">Direct integration for production-grade Sheets export</p>
                 </div>
-                {activeAgentId === SHEETS_AGENT_ID && <Badge variant="secondary" className="text-xs flex-shrink-0">Active</Badge>}
               </div>
             </div>
           </div>

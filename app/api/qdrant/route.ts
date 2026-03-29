@@ -96,6 +96,10 @@ async function upsertPoints(companies: any[]) {
       why_this_matters: c.why_this_matters || '',
       date_founded: c.date_founded || '',
       source_of_proof: c.source_of_proof || '',
+      founder_linkedin: c.founder_linkedin || '',
+      email: c.email || '',
+      marketing_community_manager_linkedin: c.marketing_community_manager_linkedin || '',
+      marketing_community_manager_email: c.marketing_community_manager_email || '',
       trending_flag: c.trending_flag || false,
       stored_at: new Date().toISOString(),
     },
@@ -156,18 +160,54 @@ export async function POST(req: NextRequest) {
         })
       }
 
-      // Store the new companies
-      await upsertPoints(companies)
-
-      // Search for similar companies for each
+      // Store the new companies and look for comparisons
       const similarMap: Record<string, any[]> = {}
+      const comparisonMap: Record<string, any> = {}
+
       for (const company of companies) {
         const queryText = companyToText(company)
+        const id = generatePointId(company.company_name || 'unknown')
+        
+        // 1. Check if it exists for comparison
+        let existingPoint: any = null
+        try {
+          const checkRes = await qdrantRequest(`/collections/${COLLECTION_NAME}/points/${id}`, 'GET')
+          if (checkRes.ok) {
+            const checkData = await checkRes.json()
+            existingPoint = checkData?.result
+          }
+        } catch {}
+
+        // 2. Perform comparison if found
+        if (existingPoint && existingPoint.payload) {
+          const oldTotal = existingPoint.payload.funding_total
+          const newTotal = company.funding_total
+          
+          comparisonMap[company.company_name] = {
+            exists: true,
+            is_new_round: oldTotal !== newTotal,
+            funding_increased: (newTotal?.length ?? 0) > (oldTotal?.length ?? 0), // Simple heuristic for Demo
+            previous_total: oldTotal,
+            new_total: newTotal,
+            recommendation: "Update record"
+          }
+        } else {
+          comparisonMap[company.company_name] = { exists: false }
+        }
+
+        // 3. Upsert (idempotent overwrite)
+        await upsertPoints([company])
+
+        // 4. Search for similar companies (for discovery)
         const similar = await searchSimilar(queryText, company.company_name || '', 3)
         similarMap[company.company_name || ''] = similar
       }
 
-      return NextResponse.json({ similar_companies: similarMap, qdrant_status: 'connected' })
+      return NextResponse.json({ 
+        similar_companies: similarMap, 
+        comparisons: comparisonMap,
+        qdrant_status: 'connected' 
+      })
     }
 
     if (action === 'search') {

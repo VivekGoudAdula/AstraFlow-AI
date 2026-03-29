@@ -20,6 +20,10 @@ export interface QdrantCompany {
   why_this_matters: string
   date_founded: string
   source_of_proof: string
+  founder_linkedin: string
+  email: string
+  marketing_community_manager_linkedin: string
+  marketing_community_manager_email: string
   trending_flag: boolean
 }
 

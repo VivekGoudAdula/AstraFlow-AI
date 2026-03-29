@@ -8,9 +8,19 @@ import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/component
 import {
   FaFire, FaExternalLinkAlt, FaLinkedin, FaEnvelope,
   FaChevronDown, FaChevronUp, FaFileExport, FaCheckCircle,
-  FaExclamationCircle, FaDatabase, FaLightbulb, FaDownload
+  FaExclamationCircle, FaDatabase, FaLightbulb, FaDownload, FaInfoCircle
 } from 'react-icons/fa'
 import { Loader2 } from 'lucide-react'
+
+// --- Helper: Clean and Validate URLs ---
+function sanitizeUrl(url: string | undefined): string | null {
+  if (!url || !url.trim() || url === 'Not specified' || url.includes('404')) return null
+  const trimmed = url.trim()
+  if (trimmed.startsWith('http')) return trimmed
+  if (trimmed.startsWith('www.')) return `https://${trimmed}`
+  if (trimmed.includes('.')) return `https://${trimmed}`
+  return null
+}
 
 export interface SimilarCompanyFromQdrant {
   company_name: string
@@ -21,12 +31,14 @@ export interface SimilarCompanyFromQdrant {
 
 export interface Company {
   company_name?: string
+  founder_name?: string
   founder_linkedin?: string
   email?: string
   funding_total?: string
   latest_funding?: string
-  source_of_proof?: string
+  source_of_proof?: string[]
   date_founded?: string
+  marketing_manager_name?: string
   marketing_community_manager_linkedin?: string
   marketing_community_manager_email?: string
   funding_score?: number
@@ -199,18 +211,38 @@ function CompanyCard({ company, qdrantMatches }: { company: Company; qdrantMatch
           </div>
         )}
 
-        {/* Source Link */}
-        {company?.source_of_proof && company.source_of_proof !== 'Not specified' && (
-          <a
-            href={company.source_of_proof.startsWith('http') ? company.source_of_proof : `https://${company.source_of_proof}`}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="inline-flex items-center gap-1.5 text-sm text-accent hover:text-accent/80 underline underline-offset-2 transition-colors duration-200"
-          >
-            <FaExternalLinkAlt className="w-3 h-3" />
-            Source
-          </a>
-        )}
+        {/* Source Links (Unbound Intelligence Evidence) */}
+        {(() => {
+          const rawSource = company?.source_of_proof
+          let topSource = ''
+          
+          if (Array.isArray(rawSource) && rawSource.length > 0) {
+            topSource = rawSource[0]
+          } else if (typeof rawSource === 'string' && rawSource !== 'Not specified') {
+            topSource = rawSource
+          }
+
+          return topSource ? (
+            <div className="flex flex-wrap gap-2 mt-2">
+              <a
+                href={topSource}
+                target="_blank"
+                rel="noopener noreferrer"
+                title={topSource}
+                className="inline-flex items-center gap-1.5 text-[10px] uppercase font-bold tracking-tight bg-primary/5 hover:bg-primary/10 text-primary border border-primary/20 px-2 py-1 rounded transition-all duration-200"
+              >
+                <FaExternalLinkAlt className="w-2.5 h-2.5 flex-shrink-0" />
+                View Source
+              </a>
+            </div>
+          ) : (
+            <span className="text-xs text-muted-foreground italic flex items-center gap-1.5 opacity-60">
+              <FaInfoCircle size={10} />
+              Verification pending
+            </span>
+          )
+        })()}
+
 
         {/* Expandable Contact Info */}
         <Collapsible open={expanded} onOpenChange={setExpanded}>
@@ -219,34 +251,40 @@ function CompanyCard({ company, qdrantMatches }: { company: Company; qdrantMatch
             <span>Contact Details</span>
           </CollapsibleTrigger>
           <CollapsibleContent className="mt-3 space-y-2 text-sm">
-            {company?.founder_linkedin && company.founder_linkedin !== 'Not specified' && (
-              <a href={company.founder_linkedin.startsWith('http') ? company.founder_linkedin : `https://${company.founder_linkedin}`} target="_blank" rel="noopener noreferrer" className="flex items-center gap-2 text-muted-foreground hover:text-foreground transition-colors duration-200">
-                <FaLinkedin className="w-4 h-4 text-blue-600" />
-                <span className="truncate">Founder LinkedIn</span>
-              </a>
-            )}
+            {(() => {
+              const cleanUrl = sanitizeUrl(company?.founder_linkedin)
+              return cleanUrl ? (
+                <a href={cleanUrl} target="_blank" rel="noopener noreferrer" className="flex items-center gap-2 text-muted-foreground hover:text-foreground transition-colors duration-200">
+                  <FaLinkedin className="w-4 h-4 text-blue-600" />
+                  <span className="truncate">Founder LinkedIn</span>
+                </a>
+              ) : null
+            })()}
             {company?.email && company.email !== 'Not specified' && (
               <a href={`mailto:${company.email}`} className="flex items-center gap-2 text-muted-foreground hover:text-foreground transition-colors duration-200">
                 <FaEnvelope className="w-4 h-4" />
                 <span className="truncate">{company.email}</span>
               </a>
             )}
-            {company?.marketing_community_manager_linkedin && company.marketing_community_manager_linkedin !== 'Not specified' && (
-              <a href={company.marketing_community_manager_linkedin.startsWith('http') ? company.marketing_community_manager_linkedin : `https://${company.marketing_community_manager_linkedin}`} target="_blank" rel="noopener noreferrer" className="flex items-center gap-2 text-muted-foreground hover:text-foreground transition-colors duration-200">
-                <FaLinkedin className="w-4 h-4 text-blue-600" />
-                <span className="truncate">Marketing Manager LinkedIn</span>
-              </a>
-            )}
+            {(() => {
+              const cleanUrl = sanitizeUrl(company?.marketing_community_manager_linkedin)
+              return cleanUrl ? (
+                <a href={cleanUrl} target="_blank" rel="noopener noreferrer" className="flex items-center gap-2 text-muted-foreground hover:text-foreground transition-colors duration-200">
+                  <FaLinkedin className="w-4 h-4 text-blue-600" />
+                  <span className="truncate">Marketing Manager LinkedIn</span>
+                </a>
+              ) : null
+            })()}
             {company?.marketing_community_manager_email && company.marketing_community_manager_email !== 'Not specified' && (
               <a href={`mailto:${company.marketing_community_manager_email}`} className="flex items-center gap-2 text-muted-foreground hover:text-foreground transition-colors duration-200">
                 <FaEnvelope className="w-4 h-4" />
                 <span className="truncate">{company.marketing_community_manager_email}</span>
               </a>
             )}
-            {/* Show message if all contact fields are "Not specified" */}
-            {(!company?.founder_linkedin || company.founder_linkedin === 'Not specified') &&
+            {/* Show message if all contact fields are null or Not specified */}
+            {!sanitizeUrl(company?.founder_linkedin) &&
              (!company?.email || company.email === 'Not specified') &&
-             (!company?.marketing_community_manager_linkedin || company.marketing_community_manager_linkedin === 'Not specified') &&
+             !sanitizeUrl(company?.marketing_community_manager_linkedin) &&
              (!company?.marketing_community_manager_email || company.marketing_community_manager_email === 'Not specified') && (
               <p className="text-xs text-muted-foreground italic">No contact details available for this company.</p>
             )}
