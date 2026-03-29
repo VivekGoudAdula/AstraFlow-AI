@@ -1,0 +1,57 @@
+{
+  "app_name": "AstraFlow AI",
+  "description": "Autonomous Funding Intelligence Engine",
+  "agents": {
+    "web_research_agent": {
+      "agent_id": "69c8e2732233a0528b6d610e",
+      "name": "Web Research Agent",
+      "type": "sub-agent",
+      "provider": "perplexity",
+      "model": "sonar-pro",
+      "response_schema_file": "response_schemas/web_research_agent_response.json"
+    },
+    "data_extraction_agent": {
+      "agent_id": "69c8e2736584d47386f56e19",
+      "name": "Data Extraction Agent",
+      "type": "sub-agent",
+      "provider": "anthropic",
+      "model": "claude-sonnet-4-6",
+      "response_schema_file": "response_schemas/data_extraction_agent_response.json"
+    },
+    "insight_enrichment_agent": {
+      "agent_id": "69c8e27417f194bf0a02432a",
+      "name": "Insight Enrichment Agent",
+      "type": "sub-agent",
+      "provider": "anthropic",
+      "model": "claude-sonnet-4-6",
+      "response_schema_file": "response_schemas/insight_enrichment_agent_response.json"
+    },
+    "funding_intelligence_coordinator": {
+      "agent_id": "69c8e2962233a0528b6d6110",
+      "name": "Funding Intelligence Coordinator",
+      "type": "manager",
+      "provider": "openai",
+      "model": "gpt-5.1",
+      "managed_agents": [
+        "69c8e2732233a0528b6d610e",
+        "69c8e2736584d47386f56e19",
+        "69c8e27417f194bf0a02432a"
+      ],
+      "response_schema_file": "response_schemas/funding_intelligence_coordinator_response.json"
+    },
+    "sheets_export_agent": {
+      "agent_id": "69c8e2a7a3afbe7693b0e0dd",
+      "name": "Sheets Export Agent",
+      "type": "independent",
+      "provider": "anthropic",
+      "model": "claude-sonnet-4-6",
+      "tools": ["GOOGLE_SHEETS__SPREADSHEET_CREATE", "GOOGLE_SHEETS__VALUES_APPEND"],
+      "response_schema_file": "response_schemas/sheets_export_agent_response.json"
+    }
+  },
+  "workflow": {
+    "entry_point": "funding_intelligence_coordinator",
+    "pipeline": ["web_research_agent", "data_extraction_agent", "insight_enrichment_agent"],
+    "independent": ["sheets_export_agent"]
+  }
+}

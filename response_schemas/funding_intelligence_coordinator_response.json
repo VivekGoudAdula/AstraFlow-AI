@@ -1,0 +1,56 @@
+{
+  "agent_name": "Funding Intelligence Coordinator",
+  "agent_id": "69c8e2962233a0528b6d6110",
+  "description": "Coordinates the full funding intelligence pipeline \u2014 routes the user's search query to the research, extraction, and enrichment sub-agents, then aggregates all enriched company profiles into a unified structured response",
+  "agent_type": "json",
+  "accessor": "result",
+  "auto_generated": true,
+  "response_schema": {
+    "companies": [
+      {
+        "company_name": "string",
+        "founder_linkedin": "string",
+        "email": "string",
+        "funding_total": "string",
+        "latest_funding": "string",
+        "source_of_proof": "string",
+        "date_founded": "string",
+        "marketing_community_manager_linkedin": "string",
+        "marketing_community_manager_email": "string",
+        "funding_score": "number",
+        "category_tag": "string",
+        "why_this_matters": "string",
+        "trending_flag": "boolean",
+        "similar_companies": [
+          "string"
+        ]
+      }
+    ],
+    "pipeline_status": "string",
+    "total_companies_found": "number"
+  },
+  "example_response": {
+    "companies": [
+      {
+        "company_name": "sample string",
+        "founder_linkedin": "sample string",
+        "email": "sample string",
+        "funding_total": "sample string",
+        "latest_funding": "sample string",
+        "source_of_proof": "sample string",
+        "date_founded": "sample string",
+        "marketing_community_manager_linkedin": "sample string",
+        "marketing_community_manager_email": "sample string",
+        "funding_score": 0,
+        "category_tag": "sample string",
+        "why_this_matters": "sample string",
+        "trending_flag": false,
+        "similar_companies": [
+          "sample string"
+        ]
+      }
+    ],
+    "pipeline_status": "sample string",
+    "total_companies_found": 0
+  }
+}
