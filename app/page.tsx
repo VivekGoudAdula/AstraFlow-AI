@@ -3,9 +3,12 @@
 import React, { useState, useCallback } from 'react'
 import { callAIAgent } from '@/lib/aiAgent'
 import type { AIAgentResponse } from '@/lib/aiAgent'
+import { storeAndFindSimilar } from '@/lib/qdrant'
+import type { SimilarCompanyFromQdrant } from './sections/ResultsGrid'
 import Header from './sections/Header'
 import LoadingState from './sections/LoadingState'
 import ResultsGrid from './sections/ResultsGrid'
+import MarketPatterns from './sections/MarketPatterns'
 import type { Company } from './sections/ResultsGrid'
 import { Badge } from '@/components/ui/badge'
 
@@ -44,11 +47,12 @@ const SAMPLE_COMPANIES: Company[] = [
     latest_funding: 'Series B - $28M',
     source_of_proof: 'https://techcrunch.com/windsurf-series-b',
     date_founded: '2021',
-    marketing_community_manager_linkedin: 'https://linkedin.com/in/windsurf-cm',
-    marketing_community_manager_email: 'community@windsurf.ai',
+    marketing_community_manager_linkedin: '',
+    marketing_community_manager_email: '',
     funding_score: 8,
-    category_tag: 'AI Code Editor',
-    why_this_matters: 'Building the next generation of AI-native code editors with deep context understanding and multi-file reasoning capabilities.',
+    score_breakdown: 'recency:3 + amount:2 + stage:3 = 8',
+    category_tag: 'Developer Tools',
+    why_this_matters: 'This funding indicates rising demand in AI-native code editors because multiple enterprise-focused VCs are betting on deep context understanding replacing traditional IDE workflows.',
     trending_flag: true,
     similar_companies: ['Cursor', 'Codeium', 'Tabnine'],
   },
@@ -63,8 +67,9 @@ const SAMPLE_COMPANIES: Company[] = [
     marketing_community_manager_linkedin: '',
     marketing_community_manager_email: '',
     funding_score: 9,
-    category_tag: 'LLM Framework',
-    why_this_matters: 'The dominant framework for building LLM-powered applications with chains, agents, and retrieval patterns.',
+    score_breakdown: 'recency:4 + amount:2 + stage:3 = 9',
+    category_tag: 'AI Agents',
+    why_this_matters: 'This funding indicates accelerating enterprise adoption of LLM orchestration frameworks because Fortune 500 companies are standardizing on chain-based architectures for production AI applications.',
     trending_flag: true,
     similar_companies: ['LlamaIndex', 'Haystack', 'Semantic Kernel'],
   },
@@ -77,10 +82,11 @@ const SAMPLE_COMPANIES: Company[] = [
     source_of_proof: 'https://neon.tech/blog/funding',
     date_founded: '2021',
     marketing_community_manager_linkedin: '',
-    marketing_community_manager_email: 'community@neon.tech',
+    marketing_community_manager_email: '',
     funding_score: 7,
-    category_tag: 'Serverless Database',
-    why_this_matters: 'Serverless Postgres with branching, autoscaling, and bottomless storage. Key infrastructure for AI app builders.',
+    score_breakdown: 'recency:1 + amount:3 + stage:3 = 7',
+    category_tag: 'Infra',
+    why_this_matters: 'This funding indicates strong demand for serverless database infrastructure because AI application builders need instant provisioning and branch-based development workflows that traditional databases cannot provide.',
     trending_flag: false,
     similar_companies: ['PlanetScale', 'Supabase', 'CockroachDB'],
   },
@@ -95,8 +101,9 @@ const SAMPLE_COMPANIES: Company[] = [
     marketing_community_manager_linkedin: '',
     marketing_community_manager_email: '',
     funding_score: 5,
-    category_tag: 'Cloud Compute',
-    why_this_matters: 'Cloud compute platform purpose-built for AI/ML workloads. Makes running GPU jobs and deploying models trivial.',
+    score_breakdown: 'recency:0 + amount:2 + stage:3 = 5',
+    category_tag: 'Infra',
+    why_this_matters: 'This funding indicates growing infrastructure spend on GPU compute because AI teams need low-friction access to GPU clusters for fine-tuning and inference without managing Kubernetes.',
     trending_flag: false,
     similar_companies: ['Replicate', 'Banana', 'RunPod'],
   },
@@ -160,6 +167,10 @@ export default function Page() {
   const [showSample, setShowSample] = useState(false)
   const [activeAgentId, setActiveAgentId] = useState<string | null>(null)
 
+  // Qdrant state
+  const [qdrantSimilar, setQdrantSimilar] = useState<Record<string, SimilarCompanyFromQdrant[]>>({})
+  const [qdrantStatus, setQdrantStatus] = useState<string>('')
+
   // Export state
   const [isExporting, setIsExporting] = useState(false)
   const [exportStatus, setExportStatus] = useState<{ type: 'success' | 'error' | null; message: string; url?: string }>({ type: null, message: '' })
@@ -171,6 +182,8 @@ export default function Page() {
     setIsLoading(true)
     setError('')
     setCompanies([])
+    setQdrantSimilar({})
+    setQdrantStatus('')
     setExportStatus({ type: null, message: '' })
     setLoadingStep('Researching market data...')
     setActiveAgentId(COORDINATOR_AGENT_ID)
@@ -189,6 +202,30 @@ export default function Page() {
         setCompanies(extracted)
         setTotalFound(data?.total_companies_found ?? extracted.length)
         setPipelineStatus(data?.pipeline_status ?? 'Complete')
+
+        // After getting companies, store in Qdrant and find similar (async, non-blocking)
+        if (extracted.length > 0) {
+          setLoadingStep('Querying vector memory...')
+          try {
+            const qdrantResult = await storeAndFindSimilar(
+              extracted.map(c => ({
+                company_name: c.company_name || '',
+                funding_total: c.funding_total || '',
+                latest_funding: c.latest_funding || '',
+                category_tag: c.category_tag || '',
+                funding_score: c.funding_score || 0,
+                why_this_matters: c.why_this_matters || '',
+                date_founded: c.date_founded || '',
+                source_of_proof: c.source_of_proof || '',
+                trending_flag: c.trending_flag || false,
+              }))
+            )
+            setQdrantSimilar(qdrantResult)
+            setQdrantStatus('connected')
+          } catch {
+            setQdrantStatus('unavailable')
+          }
+        }
       } else {
         setError(result?.error ?? 'Intelligence scan failed. Please try again.')
       }
@@ -229,7 +266,6 @@ export default function Page() {
             message: status || 'Google Sheets tool is not connected. Please connect it in Lyzr Studio first.',
           })
         } else if (!isRealUrl && url) {
-          // Agent returned a fake URL
           setExportStatus({
             type: 'error',
             message: 'Google Sheets integration is not connected. The export could not create a real spreadsheet. Please connect Google Sheets in Lyzr Studio.',
@@ -298,6 +334,11 @@ export default function Page() {
           </div>
         )}
 
+        {/* Market Pattern Detection */}
+        {!isLoading && displayCompanies.length > 0 && (
+          <MarketPatterns companies={displayCompanies} />
+        )}
+
         {/* Results with inline Export button */}
         {!isLoading && displayCompanies.length > 0 && (
           <ResultsGrid
@@ -307,12 +348,14 @@ export default function Page() {
             onExport={handleExport}
             isExporting={isExporting}
             exportStatus={exportStatus}
+            qdrantSimilar={qdrantSimilar}
+            qdrantStatus={qdrantStatus}
           />
         )}
 
         {/* Agent Status Section */}
         <div className="max-w-5xl mx-auto px-6 pb-8" id="about">
-          <div className="bg-card border border-border rounded-lg p-6 mb-24">
+          <div className="bg-card border border-border rounded-lg p-6 mb-8">
             <h4 className="font-serif text-lg font-bold text-foreground tracking-wide mb-3">Powered by AI Agents</h4>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div className="flex items-center gap-3">
