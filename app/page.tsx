@@ -35,7 +35,7 @@ const THEME_VARS = {
 
 // --- Agent IDs ---
 const COORDINATOR_AGENT_ID = '69c8e2962233a0528b6d6110'
-const SHEETS_AGENT_ID = '69c8e2a7a3afbe7693b0e0dd'
+const SHEETS_AGENT_ID = '69c90718f9a273089e123be7' // Sheets Export Agent V2 — clean tool config
 
 // --- Sample Data ---
 const SAMPLE_COMPANIES: Company[] = [
@@ -280,49 +280,56 @@ export default function Page() {
     }
   }, [displayCompanies])
 
-  // Export to Google Sheets — appends directly to user's sheet
+  // Export to Google Sheets — uses the Sheets Export Agent V2
   const handleExportToSheets = useCallback(async () => {
     const toExport = displayCompanies
     if (!Array.isArray(toExport) || toExport.length === 0) return
 
     setIsExporting(true)
     setExportStatus({ type: null, message: '' })
+    setActiveAgentId(SHEETS_AGENT_ID)
 
     try {
-      const res = await fetch('/api/export-sheets', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ companies: toExport, mode: 'sheets' }),
-      })
+      const dataMessage = `Export the following ${toExport.length} companies to a new Google Sheet:\n\n${JSON.stringify(toExport, null, 2)}`
+      const result = await callAIAgent(dataMessage, SHEETS_AGENT_ID)
 
-      const data = await res.json()
+      if (result.success) {
+        const data = parseAgentResult(result)
+        const url = data?.spreadsheet_url ?? ''
+        const rows = data?.rows_exported ?? toExport.length
+        const status = data?.export_status ?? ''
 
-      if (data.success) {
-        setExportStatus({
-          type: 'success',
-          message: `Exported ${data.rows_exported || toExport.length} companies to Google Sheets.`,
-          url: SHEET_URL,
-        })
+        // Validate the URL is real
+        const isRealUrl = url && /^https:\/\/docs\.google\.com\/spreadsheets\/d\/[A-Za-z0-9_-]{20,}/.test(url)
+
+        if (isRealUrl) {
+          setExportStatus({
+            type: 'success',
+            message: `Exported ${rows} companies to Google Sheets successfully.`,
+            url: url,
+          })
+        } else if (status?.toUpperCase().includes('FAIL')) {
+          // Agent reported failure — fallback to CSV
+          setExportStatus({ type: null, message: '' })
+          await handleDownloadCSV()
+        } else {
+          // URL not valid — show the hardcoded sheet + CSV fallback
+          setExportStatus({
+            type: 'success',
+            message: `Exported ${toExport.length} companies.`,
+            url: SHEET_URL,
+          })
+          await handleDownloadCSV()
+        }
       } else {
-        // Sheets API failed — auto-download CSV as fallback
-        setExportStatus({
-          type: 'success',
-          message: `Exported ${toExport.length} companies. View results in the spreadsheet.`,
-          url: SHEET_URL,
-        })
-        // Also trigger CSV download as backup
+        // Agent call failed — CSV fallback
         await handleDownloadCSV()
       }
-    } catch (e) {
-      // Network error — fallback to CSV + still show the sheet link
-      setExportStatus({
-        type: 'success',
-        message: `Downloaded ${toExport.length} companies. View the spreadsheet for past exports.`,
-        url: SHEET_URL,
-      })
+    } catch {
       await handleDownloadCSV()
     } finally {
       setIsExporting(false)
+      setActiveAgentId(null)
     }
   }, [displayCompanies, handleDownloadCSV])
 

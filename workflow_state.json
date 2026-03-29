@@ -39,14 +39,14 @@
       ],
       "response_schema_file": "response_schemas/funding_intelligence_coordinator_response.json"
     },
-    "sheets_export_agent": {
-      "agent_id": "69c8e2a7a3afbe7693b0e0dd",
-      "name": "Sheets Export Agent",
+    "sheets_export_agent_v2": {
+      "agent_id": "69c90718f9a273089e123be7",
+      "name": "Sheets Export Agent V2",
       "type": "independent",
       "provider": "anthropic",
       "model": "claude-sonnet-4-6",
       "tools": ["GOOGLE_SHEETS__SPREADSHEET_CREATE", "GOOGLE_SHEETS__VALUES_APPEND"],
-      "response_schema_file": "response_schemas/sheets_export_agent_response.json"
+      "response_schema_file": "response_schemas/sheets_export_agent_v2_response.json"
     }
   },
   "workflow": {
