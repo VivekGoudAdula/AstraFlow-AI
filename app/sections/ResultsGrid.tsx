@@ -4,7 +4,8 @@ import React, { useState } from 'react'
 import { Card, CardContent, CardHeader } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible'
-import { FaFire, FaExternalLinkAlt, FaLinkedin, FaEnvelope, FaChevronDown, FaChevronUp } from 'react-icons/fa'
+import { FaFire, FaExternalLinkAlt, FaLinkedin, FaEnvelope, FaChevronDown, FaChevronUp, FaFileExport, FaCheckCircle, FaExclamationCircle } from 'react-icons/fa'
+import { Loader2 } from 'lucide-react'
 
 export interface Company {
   company_name?: string
@@ -27,6 +28,9 @@ interface ResultsGridProps {
   companies: Company[]
   totalFound: number
   pipelineStatus: string
+  onExport?: () => void
+  isExporting?: boolean
+  exportStatus?: { type: 'success' | 'error' | null; message: string; url?: string }
 }
 
 function getScoreColor(score: number): string {
@@ -153,11 +157,11 @@ function CompanyCard({ company }: { company: Company }) {
   )
 }
 
-export default function ResultsGrid({ companies, totalFound, pipelineStatus }: ResultsGridProps) {
+export default function ResultsGrid({ companies, totalFound, pipelineStatus, onExport, isExporting, exportStatus }: ResultsGridProps) {
   if (!Array.isArray(companies) || companies.length === 0) return null
 
   return (
-    <div className="max-w-5xl mx-auto px-6 pb-32">
+    <div className="max-w-5xl mx-auto px-6 pb-12">
       <div className="flex items-center justify-between mb-6">
         <div>
           <h3 className="font-serif text-2xl font-bold text-foreground tracking-wide">Results</h3>
@@ -166,7 +170,45 @@ export default function ResultsGrid({ companies, totalFound, pipelineStatus }: R
             {pipelineStatus ? ` \u2014 ${pipelineStatus}` : ''}
           </p>
         </div>
+        {onExport && (
+          <Button
+            onClick={onExport}
+            disabled={isExporting}
+            className="bg-primary text-primary-foreground hover:bg-primary/90 rounded-lg font-medium tracking-wide transition-all duration-200"
+          >
+            {isExporting ? (
+              <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Exporting...</>
+            ) : (
+              <><FaFileExport className="mr-2 h-4 w-4" /> Export to Sheets</>
+            )}
+          </Button>
+        )}
       </div>
+
+      {/* Export status message inline */}
+      {exportStatus?.type === 'success' && (
+        <div className="flex items-center gap-2 text-sm text-green-700 bg-green-50 border border-green-200 rounded-lg p-3 mb-6">
+          <FaCheckCircle className="w-4 h-4 flex-shrink-0" />
+          <span>{exportStatus.message}</span>
+          {exportStatus.url && (
+            <a
+              href={exportStatus.url}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-accent font-semibold underline underline-offset-2 hover:text-accent/80 transition-colors duration-200 ml-1"
+            >
+              Open Sheet
+            </a>
+          )}
+        </div>
+      )}
+      {exportStatus?.type === 'error' && (
+        <div className="flex items-center gap-2 text-sm text-destructive bg-destructive/10 border border-destructive/30 rounded-lg p-3 mb-6">
+          <FaExclamationCircle className="w-4 h-4 flex-shrink-0" />
+          <span>{exportStatus.message}</span>
+        </div>
+      )}
+
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         {companies.map((company, idx) => (
           <CompanyCard key={`${company?.company_name ?? ''}-${idx}`} company={company} />

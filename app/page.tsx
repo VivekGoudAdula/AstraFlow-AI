@@ -6,7 +6,6 @@ import type { AIAgentResponse } from '@/lib/aiAgent'
 import Header from './sections/Header'
 import LoadingState from './sections/LoadingState'
 import ResultsGrid from './sections/ResultsGrid'
-import ExportBar from './sections/ExportBar'
 import type { Company } from './sections/ResultsGrid'
 import { Badge } from '@/components/ui/badge'
 
@@ -282,18 +281,17 @@ export default function Page() {
           </div>
         )}
 
-        {/* Results */}
+        {/* Results with inline Export button */}
         {!isLoading && displayCompanies.length > 0 && (
-          <ResultsGrid companies={displayCompanies} totalFound={totalFound} pipelineStatus={pipelineStatus} />
+          <ResultsGrid
+            companies={displayCompanies}
+            totalFound={totalFound}
+            pipelineStatus={pipelineStatus}
+            onExport={handleExport}
+            isExporting={isExporting}
+            exportStatus={exportStatus}
+          />
         )}
-
-        {/* Export Bar */}
-        <ExportBar
-          visible={!isLoading && displayCompanies.length > 0}
-          isExporting={isExporting}
-          exportStatus={exportStatus}
-          onExport={handleExport}
-        />
 
         {/* Agent Status Section */}
         <div className="max-w-5xl mx-auto px-6 pb-8" id="about">
