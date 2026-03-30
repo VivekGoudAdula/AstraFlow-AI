@@ -211,29 +211,26 @@ function CompanyCard({ company, qdrantMatches }: { company: Company; qdrantMatch
           </div>
         )}
 
-        {/* Source Links (Unbound Intelligence Evidence) */}
+        {/* Source Links (Verified Intelligence) */}
         {(() => {
           const rawSource = company?.source_of_proof
-          let topSource = ''
-          
-          if (Array.isArray(rawSource) && rawSource.length > 0) {
-            topSource = rawSource[0]
-          } else if (typeof rawSource === 'string' && rawSource !== 'Not specified') {
-            topSource = rawSource
-          }
+          const sourceLinks = Array.isArray(rawSource) ? rawSource : []
 
-          return topSource ? (
+          return sourceLinks.length > 0 ? (
             <div className="flex flex-wrap gap-2 mt-2">
-              <a
-                href={topSource}
-                target="_blank"
-                rel="noopener noreferrer"
-                title={topSource}
-                className="inline-flex items-center gap-1.5 text-[10px] uppercase font-bold tracking-tight bg-primary/5 hover:bg-primary/10 text-primary border border-primary/20 px-2 py-1 rounded transition-all duration-200"
-              >
-                <FaExternalLinkAlt className="w-2.5 h-2.5 flex-shrink-0" />
-                View Source
-              </a>
+              <p className="w-full text-[10px] text-muted-foreground tracking-wide uppercase mb-1">Source Evidence</p>
+              {sourceLinks.map((link, i) => (
+                <a
+                  key={i}
+                  href={link}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center gap-1.5 text-[9px] uppercase font-bold tracking-tight bg-primary/5 hover:bg-primary/10 text-primary border border-primary/20 px-2 py-1 rounded transition-all duration-200 truncate max-w-[150px]"
+                >
+                  <FaExternalLinkAlt className="w-2 h-2 flex-shrink-0" />
+                  {new URL(link).hostname.replace('www.', '')}
+                </a>
+              ))}
             </div>
           ) : (
             <span className="text-xs text-muted-foreground italic flex items-center gap-1.5 opacity-60">

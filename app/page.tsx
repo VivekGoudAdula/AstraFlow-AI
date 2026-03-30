@@ -37,77 +37,7 @@ const THEME_VARS = {
 // --- Agent IDs ---
 const COORDINATOR_AGENT_ID = '69c8e2962233a0528b6d6110'
 
-// --- Sample Data ---
-const SAMPLE_COMPANIES: Company[] = [
-  {
-    company_name: 'Windsurf AI',
-    founder_linkedin: 'https://linkedin.com/in/windsurf-ceo',
-    email: 'contact@windsurf.ai',
-    funding_total: '$42M',
-    latest_funding: 'Series B - $28M',
-    source_of_proof: 'https://techcrunch.com/windsurf-series-b',
-    date_founded: '2021',
-    marketing_community_manager_linkedin: '',
-    marketing_community_manager_email: '',
-    funding_score: 8,
-    score_breakdown: 'recency:3 + amount:2 + stage:3 = 8',
-    category_tag: 'Developer Tools',
-    why_this_matters: 'This funding indicates rising demand in AI-native code editors because multiple enterprise-focused VCs are betting on deep context understanding replacing traditional IDE workflows.',
-    trending_flag: true,
-    similar_companies: ['Cursor', 'Codeium', 'Tabnine'],
-  },
-  {
-    company_name: 'LangChain',
-    founder_linkedin: 'https://linkedin.com/in/hwchase17',
-    email: 'hello@langchain.dev',
-    funding_total: '$35M',
-    latest_funding: 'Series A - $25M',
-    source_of_proof: 'https://techcrunch.com/langchain-funding',
-    date_founded: '2022',
-    marketing_community_manager_linkedin: '',
-    marketing_community_manager_email: '',
-    funding_score: 9,
-    score_breakdown: 'recency:4 + amount:2 + stage:3 = 9',
-    category_tag: 'AI Agents',
-    why_this_matters: 'This funding indicates accelerating enterprise adoption of LLM orchestration frameworks because Fortune 500 companies are standardizing on chain-based architectures for production AI applications.',
-    trending_flag: true,
-    similar_companies: ['LlamaIndex', 'Haystack', 'Semantic Kernel'],
-  },
-  {
-    company_name: 'Neon',
-    founder_linkedin: 'https://linkedin.com/in/neon-founder',
-    email: 'info@neon.tech',
-    funding_total: '$104M',
-    latest_funding: 'Series B - $46M',
-    source_of_proof: 'https://neon.tech/blog/funding',
-    date_founded: '2021',
-    marketing_community_manager_linkedin: '',
-    marketing_community_manager_email: '',
-    funding_score: 7,
-    score_breakdown: 'recency:1 + amount:3 + stage:3 = 7',
-    category_tag: 'Infra',
-    why_this_matters: 'This funding indicates strong demand for serverless database infrastructure because AI application builders need instant provisioning and branch-based development workflows that traditional databases cannot provide.',
-    trending_flag: false,
-    similar_companies: ['PlanetScale', 'Supabase', 'CockroachDB'],
-  },
-  {
-    company_name: 'Modal',
-    founder_linkedin: 'https://linkedin.com/in/modal-ceo',
-    email: 'hello@modal.com',
-    funding_total: '$63.6M',
-    latest_funding: 'Series B - $46M',
-    source_of_proof: 'https://modal.com/blog/series-b',
-    date_founded: '2021',
-    marketing_community_manager_linkedin: '',
-    marketing_community_manager_email: '',
-    funding_score: 5,
-    score_breakdown: 'recency:0 + amount:2 + stage:3 = 5',
-    category_tag: 'Infra',
-    why_this_matters: 'This funding indicates growing infrastructure spend on GPU compute because AI teams need low-friction access to GPU clusters for fine-tuning and inference without managing Kubernetes.',
-    trending_flag: false,
-    similar_companies: ['Replicate', 'Banana', 'RunPod'],
-  },
-]
+// --- Placeholder removed ---
 
 // --- Helper: Parse agent result (handles string or object) ---
 function parseAgentResult(result: AIAgentResponse): any {
@@ -141,57 +71,59 @@ function normalizeFunding(value: string): string {
 function fixSourceUrls(source: any): string[] {
   if (!source || source === 'Not specified') return []
   
-  // Handled array case directly
+  let rawLinks: string[] = []
+
   if (Array.isArray(source)) {
-    return source.length > 0 ? [String(source[0]).trim()] : []
-  }
-
-  const str = String(source).trim()
-
-  // If the agent returned a stringified JSON array
-  if (str.startsWith('[') && str.endsWith(']')) {
-    try {
-      const parsed = JSON.parse(str)
-      if (Array.isArray(parsed) && parsed.length > 0) {
-        return [String(parsed[0]).trim()]
+    rawLinks = source.map(s => String(s).trim())
+  } else {
+    const str = String(source).trim()
+    // Handle stringified JSON array
+    if (str.startsWith('[') && str.endsWith(']')) {
+      try {
+        const parsed = JSON.parse(str)
+        if (Array.isArray(parsed)) {
+          rawLinks = parsed.map(s => String(s).trim())
+        }
+      } catch {
+        rawLinks = [str]
       }
-    } catch {
-      // fallback if parse fails
+    } else {
+      // Split by ' | ' or ','
+      rawLinks = str.split(/[|,]/).map(s => s.trim()).filter(Boolean)
     }
   }
 
-  // If it's just a raw comma-separated list, take the first item
-  const parts = str.split(',').map(s => s.trim()).filter(Boolean)
-  if (parts.length > 0) {
-    // simple removal of rogue quotes that break hrefs
-    return [parts[0].replace(/^["']+|["']+$/g, '')]
-  }
-
-  return [str.replace(/^["']+|["']+$/g, '')]
+  // Clean and filter (must start with http, max 3)
+  return rawLinks
+    .map(link => link.replace(/^["']+|["']+$/g, '')) // Remove rogue quotes
+    .filter(link => link.startsWith('http'))
+    .slice(0, 3)
 }
 
 // --- Helper: LinkedIn Discovery via server-side route (name OR company-only Google search) ---
-async function findLinkedInWithApify(name: string, company: string): Promise<string> {
-  if (!company || company.length < 2) return 'Not specified'
+// --- Helper: LinkedIn & Email Discovery via server-side route ---
+async function findLinkedInWithApify(name: string, company: string, role: string = 'founder'): Promise<{ profileUrl: string; email: string }> {
+  if (!company || company.length < 2) return { profileUrl: 'Not specified', email: 'Not specified' }
   const cleanName = (name && name !== 'Not specified' && name.length >= 2) ? name : ''
   try {
-    console.log(`🔍 [Apify Discovery] name="${cleanName || 'NONE'}" company="${company}"`)
+    console.log(`🔍 [Apify Discovery] role="${role}" name="${cleanName || 'NONE'}" company="${company}"`)
     const res = await fetch('/api/linkedin', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ name: cleanName, company }),
+      body: JSON.stringify({ name: cleanName, company, role }),
     })
     const data = await res.json()
-    const url = data?.profileUrl || ''
-    if (url && url.includes('linkedin.com/in/')) {
-      console.log(`✅ [Apify Discovery] Found: ${url}`)
-      return url
-    }
-    console.log(`⚠️ [Apify Discovery] No profile for: "${company}"`)
-    return 'Not specified'
+    
+    const profileUrl = (data?.profileUrl && data.profileUrl.includes('linkedin.com/in/')) ? data.profileUrl : 'Not specified'
+    const email = (data?.email && data.email.includes('@')) ? data.email : 'Not specified'
+    
+    if (profileUrl !== 'Not specified') console.log(`✅ [Apify Discovery] Found ${role}: ${profileUrl}`)
+    if (email !== 'Not specified') console.log(`📧 [Apify Discovery] Found ${role} Email: ${email}`)
+
+    return { profileUrl, email }
   } catch (err) {
-    console.error('❌ [Apify Discovery] Error:', err)
-    return 'Not specified'
+    console.error(`❌ [Apify Discovery] Error (${role}):`, err)
+    return { profileUrl: 'Not specified', email: 'Not specified' }
   }
 }
 
@@ -225,6 +157,36 @@ class ErrorBoundary extends React.Component<
   }
 }
 
+// --- Helper: Domain Deriver & Email Generator ---
+function deriveDomain(name: string, sourceUrls: string[]): string {
+  if (!name || name === 'Not specified') return ''
+  
+  // Try to extract from source URLs first
+  for (const url of sourceUrls) {
+    try {
+      const hostname = new URL(url).hostname.replace('www.', '')
+      // Basic check: if it's a major news site, skip it
+      const newsSites = ['techcrunch.com', 'bloomberg.com', 'venturebeat.com', 'crunchbase.com', 'prnewswire.com', 'globenewswire.com', 'news.crunchbase.com']
+      if (!newsSites.includes(hostname)) return hostname
+    } catch { /* skip */ }
+  }
+
+  // Fallback: simple slugification (best effort)
+  return name.toLowerCase().replace(/[^a-z0-9]/g, '') + '.ai' 
+}
+
+function generateFallbackEmail(name: string, sourceUrls: string[]): string {
+  const domain = deriveDomain(name, sourceUrls)
+  if (!domain) return 'Not specified'
+  return `contact@${domain}`
+}
+
+function generateMarketingEmail(name: string, sourceUrls: string[]): string {
+  const domain = deriveDomain(name, sourceUrls)
+  if (!domain) return 'Not specified'
+  return `marketing@${domain}`
+}
+
 // --- Page ---
 export default function Page() {
   const [searchQuery, setSearchQuery] = useState('')
@@ -234,7 +196,6 @@ export default function Page() {
   const [isLoading, setIsLoading] = useState(false)
   const [loadingStep, setLoadingStep] = useState('Researching...')
   const [error, setError] = useState('')
-  const [showSample, setShowSample] = useState(false)
   const [activeAgentId, setActiveAgentId] = useState<string | null>(null)
 
   // Qdrant state
@@ -245,7 +206,7 @@ export default function Page() {
   const [isExporting, setIsExporting] = useState(false)
   const [exportStatus, setExportStatus] = useState<{ type: 'success' | 'error' | null; message: string; url?: string }>({ type: null, message: '' })
 
-  const displayCompanies = showSample && companies.length === 0 ? SAMPLE_COMPANIES : companies
+  const displayCompanies = companies
 
   const handleSearch = useCallback(async () => {
     if (!searchQuery.trim()) return
@@ -255,28 +216,83 @@ export default function Page() {
     setQdrantSimilar({})
     setQdrantStatus('')
     setExportStatus({ type: null, message: '' })
-    setLoadingStep('Researching market data...')
+    setLoadingStep('Searching Google for source links...')
     setActiveAgentId(COORDINATOR_AGENT_ID)
 
     const stepTimer1 = setTimeout(() => setLoadingStep('Extracting company details...'), 8000)
     const stepTimer2 = setTimeout(() => setLoadingStep('Enriching funding profiles...'), 18000)
 
+    try {
+      console.log('🚀 [Scout Engine] Starting Scan for:', searchQuery)
+
+      // 🔍 1. PRE-FLOW: Fetch verified Google Search links
+      let finalLinks = 'Not specified'
+      try {
+        const searchRes = await fetch('/api/search', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ query: searchQuery + " recent AI funding news" }),
+        })
+        const searchData = await searchRes.json()
+        if (searchData.success && searchData.links?.length > 0) {
+          finalLinks = searchData.links.join(' | ')
+          console.log('🔗 [Scout Engine] Injected Verified Links:', finalLinks)
+        }
+      } catch (err) {
+        console.error('⚠️ [Scout Engine] Pre-search failed:', err)
+      }
+
+      setLoadingStep('Researching market data...')
+
+      // 🧠 2. PROMPT: Update with strict source rules and injected links
     const promptInstructions = `
 Identify recently funded AI companies for: "${searchQuery}".
 Return ONLY high-quality results with LIVE, VERIFIED links.
 
-CRITICAL INSTRUCTION: DO NOT USE techcrunch.com AS A SOURCE. Their links are blocked/failing. Use alternative sources ONLY (e.g. Crunchbase, Bloomberg, PR Newswire, VentureBeat, company blogs, or official press releases).
+SOURCE OF PROOF RULE (STRICT):
+- search_results: ${finalLinks}
+- ONLY use links from the "search_results" list provided above.
+- DO NOT generate, modify, or combine URLs.
+- DO NOT create TechCrunch links manually.
+- Pick 1–3 most relevant links for each company.
+- If no valid link exists → return "Not specified".
+- Output links as a clean string separated by " | ".
+  Example: https://bloomberg.com/... | https://venturebeat.com/...
+- NEVER return broken or partial links.
+
+EMAIL RULE (UPDATED):
+- If a direct email is found in sources → use it.
+- If NOT found:
+    → derive company domain (e.g., laminar.ai)
+    → generate a SAFE public email using: contact@domain OR hello@domain OR info@domain
+- NEVER guess personal emails (like founder@gmail.com).
+- NEVER hallucinate random emails.
+- If domain not found → return "Not specified".
+
+MARKETING CONTACT RULE:
+- Try to find a marketing or community manager from search results.
+- Look for roles like: "Marketing Manager", "Community Manager", "Growth Manager", "Developer Relations".
+- ONLY return LinkedIn if it appears in search results and the role matches.
+- If no clear match → "Not specified".
+- DO NOT guess roles or assign random employees.
+
+MARKETING LINKEDIN RULE:
+- Only return LinkedIn profile if the role clearly includes: marketing, community, growth, or developer relations.
+- Must be verifiable from search results.
+- If no valid match → "Not specified".
+- NEVER assign a founder or random employee to this role.
 
 -------------------------
 STRICT HUMAN-CENTRIC EXTRACTION (MANDATORY)
 -------------------------
-1. FOUNDER IDENTITY: You MUST identify the REAL FULL NAME of the Founder/CEO. 
-   - Check Crunchbase, LinkedIn (Company Page), or general News.
+1. FOUNDER IDENTITY: You MUST identify the REAL FULL NAME of the Founder/CEO.
    - Key to use: "founder_name"
 2. MARKETING IDENTITY: Identify the REAL FULL NAME of the Head of Growth or Marketing.
+   - Look for: Marketing Manager, Community Manager, Growth Lead, DevRel.
    - Key to use: "marketing_manager_name"
 3. NO GUESSING: DO NOT generate LinkedIn URLs. ONLY return the REAL Names.
-4. SOURCE ENTITY: "source_of_proof" MUST be an ARRAY of valid URLs (EXCLUDING techcrunch).
+4. "source_of_proof": MUST be the clean string from search inputs.
+5. "email": MUST follow the EMAIL RULE (UPDATED) above for the company/founder.
 
 EXAMPLE OUTPUT:
 {
@@ -285,11 +301,11 @@ EXAMPLE OUTPUT:
       "company_name": "OpenAI",
       "founder_name": "Sam Altman",
       "marketing_manager_name": "Not specified",
-      "email": "Not specified",
+      "email": "contact@openai.com",
       "date_founded": "2015",
       "funding_total": "$11B+",
       "latest_funding": "$6.6B led by Thrive Capital, Oct 2024",
-      "source_of_proof": ["https://www.bloomberg.com/news/articles/2024-10-02/openai-funding-round", "https://news.crunchbase.com/ai/openai-funding/"]
+      "source_of_proof": "https://www.bloomberg.com/news/articles/2024-10-02/openai-funding-round | https://news.crunchbase.com/ai/openai-funding/"
     }
   ],
   "total_companies_found": 3,
@@ -298,9 +314,6 @@ EXAMPLE OUTPUT:
 Return ONLY JSON.
 `
 
-
-    try {
-      console.log('🚀 [Scout Engine] Starting Scan for:', searchQuery)
       const result = await callAIAgent(promptInstructions, COORDINATOR_AGENT_ID)
       
       const rawCount = result?.response?.result?.length || 0
@@ -317,22 +330,23 @@ Return ONLY JSON.
         
         // 🧪 Multi-key Name Extraction (check all possible field variants)
         extracted = extracted.map(c => {
+          const raw = c as any
           // Check ALL possible field name variants the agent might use
           const fName: string = (
-            c.founder_name || 
-            c.founder || 
-            c.ceo_name || 
-            c.ceo || 
-            c.founder_ceo ||
-            c.founders ||
+            raw.founder_name || 
+            raw.founder || 
+            raw.ceo_name || 
+            raw.ceo || 
+            raw.founder_ceo ||
+            raw.founders ||
             ''
           ).trim()
 
           const mName: string = (
-            c.marketing_manager_name || 
-            c.marketing_manager ||
-            c.head_of_marketing ||
-            c.growth_lead ||
+            raw.marketing_manager_name || 
+            raw.marketing_manager ||
+            raw.head_of_marketing ||
+            raw.growth_lead ||
             ''
           ).trim()
 
@@ -363,24 +377,41 @@ Return ONLY JSON.
 
         const enriched: Company[] = await Promise.all(extracted.map(async (c: Company) => {
           let f_linkedin = c.founder_linkedin
+          let f_email = c.email
           let m_linkedin = c.marketing_community_manager_linkedin
+          let m_email = c.marketing_community_manager_email
 
           // Always try to resolve founder — even if name is empty, the server route will try
           if (!isValidLinkedIn(f_linkedin || '')) {
             const nameToSearch = c.founder_name && c.founder_name !== 'Not specified' ? c.founder_name : ''
             console.log(`🔎 [Scout Engine] Resolving Founder for "${c.company_name}" with name: "${nameToSearch || 'UNKNOWN'}"`)
-            f_linkedin = await findLinkedInWithApify(nameToSearch, c.company_name || '')
+            const discovery = await findLinkedInWithApify(nameToSearch, c.company_name || '')
+            f_linkedin = discovery.profileUrl
+            if (discovery.email !== 'Not specified' && discovery.email.includes('@')) f_email = discovery.email
           }
 
           if (!isValidLinkedIn(m_linkedin || '') && c.marketing_manager_name && c.marketing_manager_name !== 'Not specified') {
             console.log(`🔎 [Scout Engine] Resolving Marketing for "${c.company_name}": "${c.marketing_manager_name}"`)
-            m_linkedin = await findLinkedInWithApify(c.marketing_manager_name, c.company_name || '')
+            const discovery = await findLinkedInWithApify(c.marketing_manager_name!, c.company_name || '', 'marketing_manager')
+            m_linkedin = discovery.profileUrl
+            if (discovery.email !== 'Not specified' && discovery.email.includes('@')) m_email = discovery.email
+          }
+
+          // 🔥 FALLBACK ENRICHMENT: Generate "safe" public emails if still missing
+          if (!f_email || f_email === 'Not specified' || !f_email.includes('@')) {
+            f_email = generateFallbackEmail(c.company_name || '', c.source_of_proof || [])
+          }
+
+          if (!m_email || m_email === 'Not specified' || !m_email.includes('@')) {
+            m_email = generateMarketingEmail(c.company_name || '', c.source_of_proof || [])
           }
 
           return {
             ...c,
             founder_linkedin: f_linkedin,
-            marketing_community_manager_linkedin: m_linkedin
+            email: f_email,
+            marketing_community_manager_linkedin: m_linkedin,
+            marketing_community_manager_email: m_email
           }
         }))
 
@@ -405,7 +436,7 @@ Return ONLY JSON.
         setPipelineStatus(data?.pipeline_status ?? 'Deep Scan Complete')
 
         // After getting companies, store in Qdrant and find similar (async, non-blocking)
-        const toStore = highIntegrityCompanies.length > 0 ? highIntegrityCompanies : extracted
+        const toStore = highIntegrityCompanies.length > 0 ? highIntegrityCompanies : enriched
         if (toStore.length > 0) {
           setLoadingStep('Querying vector memory...')
           try {
@@ -527,23 +558,16 @@ Return ONLY JSON.
     }
   }, [displayCompanies])
 
-  const handleToggleSample = useCallback((v: boolean) => {
-    setShowSample(v)
-    if (!v && companies.length === 0) {
-      setExportStatus({ type: null, message: '' })
-    }
-  }, [companies.length])
+  // Toggle sample data removed
 
   return (
     <ErrorBoundary>
-      <div style={THEME_VARS} className="min-h-screen bg-background text-foreground font-sans">
+      <div style={THEME_VARS} className="min-h-screen bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-background via-background to-secondary/20 text-foreground font-sans selection:bg-primary/20">
         <Header
           searchQuery={searchQuery}
           setSearchQuery={setSearchQuery}
           onSearch={handleSearch}
           isLoading={isLoading}
-          showSample={showSample}
-          setShowSample={handleToggleSample}
         />
 
         {/* Error State */}
@@ -596,8 +620,8 @@ Return ONLY JSON.
         {/* Agent Status Section */}
         <div className="max-w-5xl mx-auto px-6 pb-8" id="about">
           <div className="bg-card border border-border rounded-lg p-6 mb-8">
-            <h4 className="font-serif text-lg font-bold text-foreground tracking-wide mb-3">Powered by AI Agents</h4>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <h4 className="font-serif text-lg font-bold text-foreground tracking-wide mb-4">Powered by AI Agents</h4>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
               <div className="flex items-center gap-3">
                 <div className={`w-2.5 h-2.5 rounded-full flex-shrink-0 ${activeAgentId === COORDINATOR_AGENT_ID ? 'bg-green-500 animate-pulse' : 'bg-muted-foreground/40'}`} />
                 <div className="min-w-0">
@@ -606,12 +630,32 @@ Return ONLY JSON.
                 </div>
                 {activeAgentId === COORDINATOR_AGENT_ID && <Badge variant="secondary" className="text-xs flex-shrink-0">Active</Badge>}
               </div>
+
               <div className="flex items-center gap-3">
-                <div className="w-2.5 h-2.5 rounded-full flex-shrink-0 bg-muted-foreground/40" />
+                <div className={`w-2.5 h-2.5 rounded-full flex-shrink-0 ${(loadingStep === 'Resolving professional profiles...' && isLoading) ? 'bg-blue-500 animate-pulse' : 'bg-muted-foreground/40'}`} />
+                <div className="min-w-0">
+                  <p className="text-sm font-medium text-foreground">Apify Discovery Engine</p>
+                  <p className="text-xs text-muted-foreground">Executes intelligent queries for real-time social profile verification</p>
+                </div>
+                {(loadingStep === 'Resolving professional profiles...' && isLoading) && <Badge variant="secondary" className="text-xs flex-shrink-0">Active</Badge>}
+              </div>
+
+              <div className="flex items-center gap-3">
+                <div className={`w-2.5 h-2.5 rounded-full flex-shrink-0 ${(loadingStep === 'Querying vector memory...' && isLoading) ? 'bg-purple-500 animate-pulse' : 'bg-muted-foreground/40'}`} />
+                <div className="min-w-0">
+                  <p className="text-sm font-medium text-foreground">Qdrant Vector Memory</p>
+                  <p className="text-xs text-muted-foreground">Performs high-dimensional semantic clustering to identify market competitors</p>
+                </div>
+                {(loadingStep === 'Querying vector memory...' && isLoading) && <Badge variant="secondary" className="text-xs flex-shrink-0">Active</Badge>}
+              </div>
+
+              <div className="flex items-center gap-3">
+                <div className={`w-2.5 h-2.5 rounded-full flex-shrink-0 ${isExporting ? 'bg-orange-500 animate-pulse' : 'bg-muted-foreground/40'}`} />
                 <div className="min-w-0">
                   <p className="text-sm font-medium text-foreground">Google Cloud API</p>
                   <p className="text-xs text-muted-foreground">Direct integration for production-grade Sheets export</p>
                 </div>
+                {isExporting && <Badge variant="secondary" className="text-xs flex-shrink-0">Active</Badge>}
               </div>
             </div>
           </div>

@@ -4,19 +4,15 @@ import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
 import { FaSearch } from 'react-icons/fa'
 import { Loader2 } from 'lucide-react'
-import { Switch } from '@/components/ui/switch'
-import { Label } from '@/components/ui/label'
 
 interface HeaderProps {
   searchQuery: string
   setSearchQuery: (q: string) => void
   onSearch: () => void
   isLoading: boolean
-  showSample: boolean
-  setShowSample: (v: boolean) => void
 }
 
-export default function Header({ searchQuery, setSearchQuery, onSearch, isLoading, showSample, setShowSample }: HeaderProps) {
+export default function Header({ searchQuery, setSearchQuery, onSearch, isLoading }: HeaderProps) {
   return (
     <div>
       {/* Navbar */}
@@ -26,26 +22,29 @@ export default function Header({ searchQuery, setSearchQuery, onSearch, isLoadin
             AstraFlow AI
           </h1>
           <div className="flex items-center gap-6">
-            <div className="flex items-center gap-2">
-              <Switch id="sample-toggle" checked={showSample} onCheckedChange={setShowSample} />
-              <Label htmlFor="sample-toggle" className="text-sm text-muted-foreground cursor-pointer">Sample Data</Label>
-            </div>
-            <a href="#about" className="text-sm text-muted-foreground hover:text-foreground transition-colors duration-200">About</a>
-            <a href="https://github.com" target="_blank" rel="noopener noreferrer" className="text-sm text-muted-foreground hover:text-foreground transition-colors duration-200">GitHub</a>
+            <a href="#about" className="text-sm font-medium text-muted-foreground hover:text-foreground transition-colors duration-200">About Agents</a>
+            <a href="https://github.com" target="_blank" rel="noopener noreferrer" className="text-sm font-medium text-muted-foreground hover:text-foreground transition-colors duration-200">GitHub</a>
           </div>
         </div>
       </nav>
 
       {/* Hero Section */}
-      <div className="max-w-3xl mx-auto px-6 pt-16 pb-10 text-center">
-        <h2 className="font-serif text-4xl md:text-5xl font-bold tracking-wide text-foreground leading-tight mb-4">
+      <div className="max-w-4xl mx-auto px-6 pt-24 pb-16 text-center relative z-10">
+        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-full max-w-lg h-64 bg-primary/20 blur-[100px] rounded-full -z-10 pointer-events-none" />
+        
+        <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-secondary/50 border border-border/50 text-xs font-semibold text-primary mb-6">
+          <span className="w-2 h-2 rounded-full bg-primary animate-pulse" />
+          Powered by Deep Market Intelligence
+        </div>
+
+        <h2 className="font-serif text-5xl md:text-6xl font-extrabold tracking-tight text-transparent bg-clip-text bg-gradient-to-br from-foreground to-muted-foreground leading-tight mb-6">
           AI Funding Intelligence Engine
         </h2>
-        <p className="text-muted-foreground text-lg leading-relaxed mb-10 max-w-xl mx-auto">
-          Track, remember, and explain the AI developer tool market.
+        <p className="text-muted-foreground/90 md:text-xl text-lg leading-relaxed mb-10 max-w-2xl mx-auto font-light">
+          Track, remember, and analyze the AI developer tool market with <span className="text-foreground font-medium">high-fidelity semantic search.</span>
         </p>
 
-        <div className="flex flex-col sm:flex-row gap-3 max-w-2xl mx-auto">
+        <div className="flex flex-col sm:flex-row gap-3 max-w-2xl mx-auto shadow-xl shadow-black/5 rounded-xl">
           <div className="relative flex-1">
             <FaSearch className="absolute left-4 top-1/2 -translate-y-1/2 text-muted-foreground w-4 h-4" />
             <Input

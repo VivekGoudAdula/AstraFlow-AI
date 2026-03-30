@@ -1,4 +1,4 @@
-# AI Funding Scout & Intelligence Engine
+# ASTRAFLOW AI - AI Funding Scout & Intelligence Engine
 *(Lyzr x Qdrant Hackathon: Autonomous Ecosystems)*
 
 An autonomous, high-integrity startup discovery pipeline built to analyze AI market trends and funding rounds without the hallucinations typical of LLMs. 
