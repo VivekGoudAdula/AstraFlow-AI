@@ -4,7 +4,8 @@ import React, { useMemo } from 'react'
 import { Card, CardContent, CardHeader } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import type { Company } from './ResultsGrid'
-import { FaChartLine, FaArrowUp, FaLayerGroup } from 'react-icons/fa'
+import { FaChartLine, FaArrowUp, FaLayerGroup, FaMeteor } from 'react-icons/fa'
+import { Activity, BarChart3, Target, Zap } from 'lucide-react'
 
 interface MarketPatternsProps {
   companies: Company[]
@@ -41,32 +42,32 @@ export default function MarketPatterns({ companies }: MarketPatternsProps) {
           count: topCount,
           total,
           percentage: Math.round((topCount / total) * 100),
-          description: `${topCount}/${total} companies are focused on ${topCategory}`,
+          description: `${topCount}/${total} focused on ${topCategory}`,
         })
       }
     }
 
     // 2. Trending concentration
     const trendingCount = companies.filter((c) => c.trending_flag).length
-    if (trendingCount > 0) {
+    if (total > 0) {
       insights.push({
-        label: 'Trending',
+        label: 'Trending Momentum',
         count: trendingCount,
         total,
         percentage: Math.round((trendingCount / total) * 100),
-        description: `${trendingCount}/${total} companies are currently trending (high score + recent funding)`,
+        description: `${trendingCount}/${total} assets showing high velocity`,
       })
     }
 
     // 3. High-score concentration
     const highScoreCount = companies.filter((c) => (c.funding_score ?? 0) >= 7).length
-    if (highScoreCount > 0) {
+    if (total > 0) {
       insights.push({
-        label: 'High Conviction',
+        label: 'Institutional Grade',
         count: highScoreCount,
         total,
         percentage: Math.round((highScoreCount / total) * 100),
-        description: `${highScoreCount}/${total} companies scored 7+ indicating strong market confidence`,
+        description: `${highScoreCount}/${total} pass institutional threshold`,
       })
     }
 
@@ -75,102 +76,84 @@ export default function MarketPatterns({ companies }: MarketPatternsProps) {
       companies.reduce((sum, c) => sum + (c.funding_score ?? 0), 0) / total
     const roundedAvg = Math.round(avgScore * 10) / 10
 
-    // 5. Funding size patterns
-    const largeFunding = companies.filter((c) => {
-      const amount = c.funding_total || ''
-      const numMatch = amount.match(/\$?([\d.]+)\s*(B|M|K)?/i)
-      if (!numMatch) return false
-      const num = parseFloat(numMatch[1])
-      const unit = (numMatch[2] || '').toUpperCase()
-      if (unit === 'B') return true
-      if (unit === 'M' && num >= 50) return true
-      return false
-    }).length
-
-    if (largeFunding > 0) {
-      insights.push({
-        label: 'Large Rounds ($50M+)',
-        count: largeFunding,
-        total,
-        percentage: Math.round((largeFunding / total) * 100),
-        description: `${largeFunding}/${total} companies raised $50M+ rounds — indicates mature market segment`,
-      })
-    }
-
     return { insights, sortedCategories, avgScore: roundedAvg, trendingCount }
   }, [companies])
 
   if (patterns.insights.length === 0) return null
 
   return (
-    <div className="max-w-5xl mx-auto px-6 pb-8">
-      <Card className="bg-card border border-border rounded-lg overflow-hidden">
-        <CardHeader className="pb-3">
-          <div className="flex items-center gap-2">
-            <FaChartLine className="w-5 h-5 text-accent" />
-            <h3 className="font-serif text-xl font-bold text-foreground tracking-wide">
-              Market Pattern Detection
-            </h3>
-          </div>
-          <p className="text-sm text-muted-foreground mt-1">
-            Automated trend analysis across {companies.length} companies in this scan
-          </p>
-        </CardHeader>
-        <CardContent className="pt-0">
-          {/* Pattern Bars */}
-          <div className="space-y-4 mb-6">
-            {patterns.insights.map((insight, idx) => (
-              <div key={idx} className="space-y-1.5">
-                <div className="flex items-center justify-between text-sm">
-                  <div className="flex items-center gap-2">
-                    {insight.label === 'Trending' ? (
-                      <FaArrowUp className="w-3.5 h-3.5 text-orange-500" />
-                    ) : (
-                      <FaLayerGroup className="w-3.5 h-3.5 text-accent" />
-                    )}
-                    <span className="font-medium text-foreground">{insight.description}</span>
-                  </div>
-                  <Badge variant="secondary" className="text-xs">
-                    {insight.percentage}%
-                  </Badge>
-                </div>
-                <div className="w-full bg-muted rounded-full h-2">
-                  <div
-                    className="bg-accent h-2 rounded-full transition-all duration-500 ease-out"
-                    style={{ width: `${Math.max(insight.percentage, 8)}%` }}
-                  />
-                </div>
-              </div>
-            ))}
-          </div>
-
-          {/* Summary Stats Row */}
-          <div className="grid grid-cols-3 gap-4 pt-4 border-t border-border">
-            <div className="text-center">
-              <p className="text-2xl font-bold text-foreground font-serif">{patterns.avgScore}</p>
-              <p className="text-xs text-muted-foreground tracking-wide uppercase">Avg. Funding Score</p>
+    <div className="max-w-7xl mx-auto px-6 pb-12">
+      <Card className="glass-card border-primary/20 overflow-hidden relative">
+        <div className="absolute top-0 right-0 p-4 opacity-10">
+          <Activity className="w-32 h-32 text-primary" />
+        </div>
+        
+        <CardHeader className="pb-6">
+          <div className="flex items-center gap-3">
+            <div className="p-2 rounded-xl bg-primary/10 border border-primary/30">
+              <BarChart3 className="w-5 h-5 text-primary" />
             </div>
-            <div className="text-center">
-              <p className="text-2xl font-bold text-foreground font-serif">{patterns.sortedCategories.length}</p>
-              <p className="text-xs text-muted-foreground tracking-wide uppercase">Categories Detected</p>
-            </div>
-            <div className="text-center">
-              <p className="text-2xl font-bold text-foreground font-serif">{patterns.trendingCount}</p>
-              <p className="text-xs text-muted-foreground tracking-wide uppercase">Trending Startups</p>
-            </div>
-          </div>
-
-          {/* Dominant Trend Callout */}
-          {patterns.insights.length > 0 && patterns.insights[0].percentage >= 40 && (
-            <div className="mt-4 bg-accent/10 border border-accent/20 rounded-lg p-3">
-              <p className="text-sm font-medium text-foreground">
-                <span className="text-accent font-bold">Strong trend detected:</span>{' '}
-                {patterns.insights[0].description} — this suggests significant investor momentum in this segment.
+            <div>
+              <h3 className="text-2xl font-black text-white tracking-tight uppercase">
+                MARKET <span className="text-primary italic">SIGNALS</span>
+              </h3>
+              <p className="text-white/40 text-xs font-medium tracking-wide">
+                SYNTACTIC PATTERN RECOGNITION ACROSS {companies.length} ENTITIES
               </p>
             </div>
-          )}
+          </div>
+        </CardHeader>
+
+        <CardContent className="space-y-6">
+          {/* Pattern Bars */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+            <div className="space-y-6">
+              {patterns.insights.map((insight, idx) => (
+                <div key={idx} className="space-y-2 group">
+                  <div className="flex items-center justify-between">
+                    <span className="text-[10px] font-black text-white/50 uppercase tracking-[0.1em] group-hover:text-primary transition-colors">
+                      {insight.label}
+                    </span>
+                    <span className="text-xs font-black text-primary">{insight.percentage}%</span>
+                  </div>
+                  <div className="h-1.5 w-full bg-white/5 rounded-full overflow-hidden border border-white/5">
+                    <div
+                      className="bg-gradient-to-r from-primary to-accent h-full rounded-full transition-all duration-1000 ease-out shadow-[0_0_10px_hsla(var(--primary),0.5)]"
+                      style={{ width: `${Math.max(insight.percentage, 5)}%` }}
+                    />
+                  </div>
+                  <p className="text-[11px] text-white/30 font-medium">{insight.description}</p>
+                </div>
+              ))}
+            </div>
+
+            {/* Quick Metrics */}
+            <div className="grid grid-cols-2 gap-4">
+              <div className="p-6 rounded-[2rem] bg-white/5 border border-white/10 flex flex-col items-center justify-center text-center group hover:bg-white/10 transition-all">
+                <Target className="w-6 h-6 text-primary mb-3 group-hover:scale-110 transition-transform" />
+                <span className="text-3xl font-black text-white mb-1">{patterns.avgScore}</span>
+                <span className="text-[8px] font-black uppercase text-white/30 tracking-widest">Aggregated Score</span>
+              </div>
+              <div className="p-6 rounded-[2rem] bg-white/5 border border-white/10 flex flex-col items-center justify-center text-center group hover:bg-white/10 transition-all">
+                <Zap className="w-6 h-6 text-accent mb-3 group-hover:scale-110 transition-transform" />
+                <span className="text-3xl font-black text-white mb-1">{patterns.trendingCount}</span>
+                <span className="text-[8px] font-black uppercase text-white/30 tracking-widest">Growth Assets</span>
+              </div>
+              <div className="col-span-2 p-4 rounded-2xl bg-primary/10 border border-primary/20">
+                 <div className="flex items-center gap-3">
+                   <div className="w-10 h-10 rounded-full bg-primary/20 flex items-center justify-center border border-primary/30">
+                     <FaMeteor className="text-primary" />
+                   </div>
+                   <p className="text-xs font-bold text-white/80 leading-snug">
+                     <span className="text-primary">Intelligence Note:</span> This micro-market shows {patterns.avgScore > 6 ? 'high structural integrity' : 'emerging volatility'}. Focus on {patterns.sortedCategories[0]?.[0] || 'core technologies'}.
+                   </p>
+                 </div>
+              </div>
+            </div>
+          </div>
         </CardContent>
       </Card>
     </div>
   )
 }
+

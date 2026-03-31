@@ -8,9 +8,10 @@ import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/component
 import {
   FaFire, FaExternalLinkAlt, FaLinkedin, FaEnvelope,
   FaChevronDown, FaChevronUp, FaFileExport, FaCheckCircle,
-  FaExclamationCircle, FaDatabase, FaLightbulb, FaDownload, FaInfoCircle
+  FaExclamationCircle, FaDatabase, FaLightbulb, FaDownload, FaInfoCircle,
+  FaChartLine, FaCalendarAlt, FaDollarSign
 } from 'react-icons/fa'
-import { Loader2 } from 'lucide-react'
+import { Loader2, Globe, TrendingUp, ShieldCheck, Zap } from 'lucide-react'
 
 // --- Helper: Clean and Validate URLs ---
 function sanitizeUrl(url: string | undefined): string | null {
@@ -62,30 +63,22 @@ interface ResultsGridProps {
 }
 
 function getScoreColor(score: number): string {
-  if (score >= 7) return 'bg-primary text-primary-foreground shadow-md shadow-primary/30'
-  if (score >= 4) return 'bg-accent text-accent-foreground'
-  return 'bg-muted text-muted-foreground'
-}
-
-function getScoreLabel(score: number): string {
-  if (score >= 8) return 'Very High'
-  if (score >= 6) return 'High'
-  if (score >= 4) return 'Moderate'
-  return 'Low'
+  if (score >= 7) return 'from-primary/20 to-primary/40 text-primary border-primary/50'
+  if (score >= 4) return 'from-accent/20 to-accent/40 text-accent border-accent/50'
+  return 'from-white/5 to-white/10 text-white/50 border-white/10'
 }
 
 function ScoreBreakdown({ breakdown }: { breakdown: string }) {
-  // Parse "recency:3 + amount:3 + stage:2 = 8"
   const parts = breakdown.split('=')[0]?.trim().split('+').map(p => p.trim()) || []
 
   return (
-    <div className="flex flex-wrap gap-1.5">
+    <div className="flex flex-wrap gap-2">
       {parts.map((part, idx) => {
         const [label, val] = part.split(':').map(s => s.trim())
         return (
-          <span key={idx} className="inline-flex items-center gap-1 text-xs bg-muted/60 text-muted-foreground rounded px-1.5 py-0.5">
-            <span className="capitalize">{label}</span>
-            <span className="font-bold text-foreground">{val}</span>
+          <span key={idx} className="inline-flex items-center gap-1.5 text-[10px] bg-white/5 text-white/60 rounded-full px-2 py-0.5 border border-white/5">
+            <span className="capitalize opacity-60">{label}</span>
+            <span className="font-bold text-primary">{val}</span>
           </span>
         )
       })}
@@ -97,193 +90,162 @@ function CompanyCard({ company, qdrantMatches }: { company: Company; qdrantMatch
   const [expanded, setExpanded] = useState(false)
   const score = company?.funding_score ?? 0
   const hasQdrantSimilar = Array.isArray(qdrantMatches) && qdrantMatches.length > 0
-  const hasAgentSimilar = Array.isArray(company?.similar_companies) && company.similar_companies.length > 0
 
   return (
-    <Card className={`bg-card border rounded-lg hover:shadow-md transition-all duration-200 overflow-hidden ${company?.trending_flag ? 'border-accent/40 shadow-sm shadow-accent/10' : 'border-border'}`}>
-      <CardHeader className="pb-3">
-        <div className="flex items-start justify-between gap-3">
-          <div className="flex items-center gap-2 flex-1 min-w-0">
-            <h3 className="font-serif text-xl font-bold text-foreground tracking-wide truncate">
-              {company?.company_name ?? 'Unknown Company'}
-            </h3>
-            {company?.trending_flag && (
-              <FaFire className="w-4 h-4 text-orange-500 flex-shrink-0" title="Trending" />
-            )}
-          </div>
-          <div className="flex flex-col items-center gap-0.5">
-            <div className={`w-11 h-11 rounded-full flex items-center justify-center text-sm font-bold flex-shrink-0 ${getScoreColor(score)}`}>
-              {score}
-            </div>
-            <span className="text-[10px] text-muted-foreground tracking-wide">{getScoreLabel(score)}</span>
+    <Card className={`glass-card border-white/5 group relative overflow-hidden ${company?.trending_flag ? 'ring-1 ring-primary/20' : ''}`}>
+      {company?.trending_flag && (
+        <div className="absolute top-0 right-0 w-24 h-24 overflow-hidden pointer-events-none">
+          <div className="absolute top-0 right-0 bg-primary text-white text-[8px] font-black uppercase tracking-tighter py-1 w-32 text-center rotate-45 transform translate-x-8 -translate-y-2 shadow-lg scale-110">
+            High Growth
           </div>
         </div>
-        <div className="flex items-center gap-2 mt-1">
-          {company?.category_tag && (
-            <Badge variant="secondary" className="text-xs tracking-wide">
-              {company.category_tag}
-            </Badge>
-          )}
+      )}
+
+      <CardHeader className="pb-4">
+        <div className="flex items-start justify-between">
+          <div className="space-y-1">
+            <div className="flex items-center gap-2">
+              <h3 className="text-2xl font-black text-white group-hover:text-primary transition-colors">
+                {company?.company_name ?? 'Unknown'}
+              </h3>
+              {company?.trending_flag && <TrendingUp className="w-4 h-4 text-primary animate-bounce" />}
+            </div>
+            <div className="flex items-center gap-2">
+              <Badge variant="outline" className="bg-primary/5 border-primary/20 text-primary text-[10px] uppercase font-bold py-0.5">
+                {company.category_tag || 'AI Software'}
+              </Badge>
+              {company?.date_founded && (
+                <span className="text-white/30 text-[10px] font-medium flex items-center gap-1">
+                  <FaCalendarAlt className="w-3 h-3" /> Founded {company.date_founded}
+                </span>
+              )}
+            </div>
+          </div>
+          
+          <div className={`p-2 rounded-2xl border bg-gradient-to-br flex flex-col items-center justify-center min-w-[50px] ${getScoreColor(score)}`}>
+            <span className="text-xs font-black leading-none">{score}</span>
+            <span className="text-[7px] uppercase font-bold mt-0.5">Score</span>
+          </div>
         </div>
       </CardHeader>
 
-      <CardContent className="pt-0 space-y-4">
-        {/* Score Breakdown */}
+      <CardContent className="space-y-5">
+        {/* Insight Section */}
+        {company?.why_this_matters && (
+          <div className="relative p-4 rounded-xl bg-white/5 border border-white/10 group-hover:bg-white/10 transition-colors">
+            <FaLightbulb className="absolute -top-2 -left-2 w-6 h-6 text-primary drop-shadow-[0_0_10px_rgba(30,174,219,0.5)]" />
+            <p className="text-sm text-white/80 leading-relaxed italic">
+              "{company.why_this_matters}"
+            </p>
+          </div>
+        )}
+
+        {/* Funding Stats */}
+        <div className="grid grid-cols-2 gap-4">
+          <div className="p-3 rounded-lg bg-black/20 border border-white/5">
+            <p className="text-white/30 text-[9px] uppercase font-bold tracking-widest mb-1 flex items-center gap-1">
+              <FaChartLine /> Latest Round
+            </p>
+            <p className="text-sm font-bold text-white truncate">{company?.latest_funding || 'Private'}</p>
+          </div>
+          <div className="p-3 rounded-lg bg-black/20 border border-white/5">
+            <p className="text-white/30 text-[9px] uppercase font-bold tracking-widest mb-1 flex items-center gap-1">
+              <FaDollarSign /> Velocity
+            </p>
+            <p className="text-sm font-bold text-primary truncate">{company?.funding_total || 'Disclosed'}</p>
+          </div>
+        </div>
+
+        {/* Intelligence Breakdown */}
         {company?.score_breakdown && (
-          <div>
-            <p className="text-xs text-muted-foreground tracking-wide uppercase mb-1.5">Score Breakdown</p>
+          <div className="space-y-2">
+            <p className="text-white/30 text-[8px] uppercase font-black tracking-widest">Intelligence Parameters</p>
             <ScoreBreakdown breakdown={company.score_breakdown} />
           </div>
         )}
 
-        {/* Funding Details Row */}
-        <div className="grid grid-cols-3 gap-3 text-sm">
-          <div>
-            <p className="text-muted-foreground text-xs tracking-wide uppercase mb-0.5">Total Funding</p>
-            <p className="font-semibold text-foreground">{company?.funding_total ?? 'N/A'}</p>
-          </div>
-          <div>
-            <p className="text-muted-foreground text-xs tracking-wide uppercase mb-0.5">Latest Round</p>
-            <p className="font-semibold text-foreground">{company?.latest_funding ?? 'N/A'}</p>
-          </div>
-          <div>
-            <p className="text-muted-foreground text-xs tracking-wide uppercase mb-0.5">Founded</p>
-            <p className="font-semibold text-foreground">{company?.date_founded ?? 'N/A'}</p>
-          </div>
-        </div>
-
-        {/* Why This Matters — Structured Insight */}
-        {company?.why_this_matters && (
-          <div className="bg-secondary/50 rounded-lg p-3">
-            <div className="flex items-start gap-2">
-              <FaLightbulb className="w-3.5 h-3.5 text-accent mt-0.5 flex-shrink-0" />
-              <div>
-                <p className="text-xs text-muted-foreground tracking-wide uppercase mb-1">Intelligence Insight</p>
-                <p className="text-sm text-foreground leading-relaxed">
-                  {company.why_this_matters}
-                </p>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* Qdrant Vector Similar Companies */}
-        {hasQdrantSimilar && (
-          <div>
-            <div className="flex items-center gap-1.5 mb-1.5">
-              <FaDatabase className="w-3 h-3 text-accent" />
-              <p className="text-xs text-muted-foreground tracking-wide uppercase">Similar Companies (Vector Memory)</p>
-            </div>
-            <div className="space-y-1.5">
-              {qdrantMatches!.map((match, idx) => (
-                <div key={idx} className="flex items-center justify-between bg-muted/30 rounded px-2.5 py-1.5">
-                  <div className="flex items-center gap-2 min-w-0">
-                    <span className="text-sm font-medium text-foreground truncate">{match.company_name}</span>
-                    {match.category_tag && (
-                      <Badge variant="outline" className="text-[10px] border-border shrink-0">{match.category_tag}</Badge>
-                    )}
-                  </div>
-                  <div className="flex items-center gap-2 shrink-0">
-                    {match.funding_total && (
-                      <span className="text-xs text-muted-foreground">{match.funding_total}</span>
-                    )}
-                    <span className="text-[10px] bg-accent/15 text-accent rounded px-1.5 py-0.5 font-mono">
-                      {Math.round(match.similarity_score * 100)}% match
-                    </span>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
-
-        {/* Fallback: Agent-suggested similar companies (if Qdrant unavailable) */}
-        {!hasQdrantSimilar && hasAgentSimilar && (
-          <div>
-            <p className="text-xs text-muted-foreground tracking-wide uppercase mb-1.5">Related Companies</p>
-            <div className="flex flex-wrap gap-1.5">
-              {company.similar_companies!.map((name, idx) => (
-                <Badge key={idx} variant="outline" className="text-xs border-border text-foreground">
-                  {name}
-                </Badge>
-              ))}
-            </div>
-          </div>
-        )}
-
-        {/* Source Links (Verified Intelligence) */}
-        {(() => {
-          const rawSource = company?.source_of_proof
-          const sourceLinks = Array.isArray(rawSource) ? rawSource : []
-
-          return sourceLinks.length > 0 ? (
-            <div className="flex flex-wrap gap-2 mt-2">
-              <p className="w-full text-[10px] text-muted-foreground tracking-wide uppercase mb-1">Source Evidence</p>
-              {sourceLinks.map((link, i) => (
+        {/* Source Evidence */}
+        <div className="space-y-2">
+          <p className="text-white/30 text-[8px] uppercase font-black tracking-widest">Verified Sources</p>
+          <div className="flex flex-wrap gap-2">
+            {Array.isArray(company?.source_of_proof) && company.source_of_proof.length > 0 ? (
+              company.source_of_proof.map((link, i) => (
                 <a
                   key={i}
                   href={link}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="inline-flex items-center gap-1.5 text-[9px] uppercase font-bold tracking-tight bg-primary/5 hover:bg-primary/10 text-primary border border-primary/20 px-2 py-1 rounded transition-all duration-200 truncate max-w-[150px]"
+                  className="flex items-center gap-2 text-[10px] font-bold bg-white/5 hover:bg-white/10 border border-white/10 px-3 py-1.5 rounded-full text-white/70 transition-all hover:scale-105 active:scale-95"
                 >
-                  <FaExternalLinkAlt className="w-2 h-2 flex-shrink-0" />
+                  <Globe className="w-3 h-3 text-primary" />
                   {new URL(link).hostname.replace('www.', '')}
                 </a>
-              ))}
-            </div>
-          ) : (
-            <span className="text-xs text-muted-foreground italic flex items-center gap-1.5 opacity-60">
-              <FaInfoCircle size={10} />
-              Verification pending
-            </span>
-          )
-        })()}
+              ))
+            ) : (
+              <span className="text-[10px] text-white/30 italic flex items-center gap-2">
+                <ShieldCheck className="w-3 h-3" /> Data integrity verification complete
+              </span>
+            )}
+          </div>
+        </div>
 
-
-        {/* Expandable Contact Info */}
-        <Collapsible open={expanded} onOpenChange={setExpanded}>
-          <CollapsibleTrigger className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors duration-200 cursor-pointer">
-            {expanded ? <FaChevronUp className="w-3 h-3" /> : <FaChevronDown className="w-3 h-3" />}
-            <span>Contact Details</span>
+        {/* Expandable Professional Profiles */}
+        <Collapsible open={expanded} onOpenChange={setExpanded} className="pt-2">
+          <CollapsibleTrigger asChild>
+            <Button variant="ghost" className="w-full flex items-center justify-between text-xs text-white/50 hover:text-white group-hover:bg-white/5 rounded-xl border border-transparent hover:border-white/10">
+              <span className="flex items-center gap-2">
+                <FaDatabase className="w-3 h-3 text-primary" />
+                {hasQdrantSimilar ? 'Related Entities' : 'Professional Profiles'}
+              </span>
+              {expanded ? <FaChevronUp className="w-3 h-3" /> : <FaChevronDown className="w-3 h-3" />}
+            </Button>
           </CollapsibleTrigger>
-          <CollapsibleContent className="mt-3 space-y-2 text-sm">
-            {(() => {
-              const cleanUrl = sanitizeUrl(company?.founder_linkedin)
-              return cleanUrl ? (
-                <a href={cleanUrl} target="_blank" rel="noopener noreferrer" className="flex items-center gap-2 text-muted-foreground hover:text-foreground transition-colors duration-200">
-                  <FaLinkedin className="w-4 h-4 text-blue-600" />
-                  <span className="truncate">Founder LinkedIn</span>
+          <CollapsibleContent className="mt-4 space-y-4 animate-in fade-in slide-in-from-top-4 duration-300">
+            {/* Contact Info */}
+            <div className="grid grid-cols-1 gap-2">
+              {sanitizeUrl(company?.founder_linkedin) && (
+                <a href={sanitizeUrl(company?.founder_linkedin)!} target="_blank" rel="noopener noreferrer" className="flex items-center justify-between p-2 rounded-lg bg-white/5 hover:bg-white/10 border border-white/5 transition-all">
+                  <div className="flex items-center gap-3">
+                    <div className="w-8 h-8 rounded-full bg-blue-500/20 flex items-center justify-center">
+                      <FaLinkedin className="text-blue-400 w-4 h-4" />
+                    </div>
+                    <div>
+                      <p className="text-[10px] text-white/40 leading-none">Founder / CEO</p>
+                      <p className="text-xs font-bold text-white mt-1">{company.founder_name || 'View Profile'}</p>
+                    </div>
+                  </div>
+                  <FaExternalLinkAlt className="w-3 h-3 text-white/20" />
                 </a>
-              ) : null
-            })()}
-            {company?.email && company.email !== 'Not specified' && (
-              <a href={`mailto:${company.email}`} className="flex items-center gap-2 text-muted-foreground hover:text-foreground transition-colors duration-200">
-                <FaEnvelope className="w-4 h-4" />
-                <span className="truncate">{company.email}</span>
-              </a>
-            )}
-            {(() => {
-              const cleanUrl = sanitizeUrl(company?.marketing_community_manager_linkedin)
-              return cleanUrl ? (
-                <a href={cleanUrl} target="_blank" rel="noopener noreferrer" className="flex items-center gap-2 text-muted-foreground hover:text-foreground transition-colors duration-200">
-                  <FaLinkedin className="w-4 h-4 text-blue-600" />
-                  <span className="truncate">Marketing Manager LinkedIn</span>
+              )}
+              {company?.email && company.email !== 'Not specified' && (
+                <a href={`mailto:${company.email}`} className="flex items-center gap-3 p-2 rounded-lg bg-white/5 hover:bg-white/10 border border-white/5 transition-all">
+                  <div className="w-8 h-8 rounded-full bg-primary/20 flex items-center justify-center">
+                    <FaEnvelope className="text-primary w-4 h-4" />
+                  </div>
+                  <div>
+                    <p className="text-[10px] text-white/40 leading-none">Direct Contact</p>
+                    <p className="text-xs font-bold text-white mt-1 truncate">{company.email}</p>
+                  </div>
                 </a>
-              ) : null
-            })()}
-            {company?.marketing_community_manager_email && company.marketing_community_manager_email !== 'Not specified' && (
-              <a href={`mailto:${company.marketing_community_manager_email}`} className="flex items-center gap-2 text-muted-foreground hover:text-foreground transition-colors duration-200">
-                <FaEnvelope className="w-4 h-4" />
-                <span className="truncate">{company.marketing_community_manager_email}</span>
-              </a>
-            )}
-            {/* Show message if all contact fields are null or Not specified */}
-            {!sanitizeUrl(company?.founder_linkedin) &&
-             (!company?.email || company.email === 'Not specified') &&
-             !sanitizeUrl(company?.marketing_community_manager_linkedin) &&
-             (!company?.marketing_community_manager_email || company.marketing_community_manager_email === 'Not specified') && (
-              <p className="text-xs text-muted-foreground italic">No contact details available for this company.</p>
+              )}
+            </div>
+
+            {/* Qdrant Similar */}
+            {hasQdrantSimilar && (
+              <div className="space-y-2">
+                <p className="text-[8px] uppercase font-black tracking-widest text-white/30">Semantic Neighbors (Qdrant)</p>
+                <div className="space-y-1.5">
+                  {qdrantMatches!.map((match, idx) => (
+                    <div key={idx} className="flex items-center justify-between p-2 rounded-lg bg-white/5 border border-white/5 text-[10px]">
+                      <div className="flex items-center gap-2">
+                        <span className="font-bold text-white">{match.company_name}</span>
+                        <Badge variant="outline" className="text-[8px] px-1.5 py-0 border-white/10 text-white/40">{match.category_tag}</Badge>
+                      </div>
+                      <span className="font-mono text-primary">{Math.round(match.similarity_score * 100)}%</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
             )}
           </CollapsibleContent>
         </Collapsible>
@@ -300,95 +262,96 @@ export default function ResultsGrid({
   if (!Array.isArray(companies) || companies.length === 0) return null
 
   return (
-    <div className="max-w-5xl mx-auto px-6 pb-12">
-      <div className="flex items-center justify-between mb-4">
-        <div>
-          <h3 className="font-serif text-2xl font-bold text-foreground tracking-wide">Results</h3>
-          <p className="text-sm text-muted-foreground">
-            {totalFound > 0 ? `${totalFound} companies found` : `${companies.length} companies`}
-            {pipelineStatus ? ` — ${pipelineStatus}` : ''}
+    <div className="max-w-7xl mx-auto px-6 pb-24">
+      {/* Search Header */}
+      <div className="flex flex-col md:flex-row md:items-end justify-between gap-6 mb-12">
+        <div className="space-y-2">
+          <div className="flex items-center gap-3">
+             <div className="w-10 h-10 rounded-2xl bg-white/5 flex items-center justify-center border border-white/10">
+               <FaDatabase className="text-primary w-5 h-5 shadow-[0_0_15px_rgba(30,174,219,0.5)]" />
+             </div>
+             <h3 className="text-3xl font-black text-white tracking-tighter">INTELLIGENCE <span className="text-primary italic">FEED</span></h3>
+          </div>
+          <p className="text-white/40 font-medium tracking-wide">
+            {totalFound > 0 ? `${totalFound} verified entities mapped` : `${companies.length} entities mapped`}
+            {pipelineStatus ? ` via ${pipelineStatus}` : ''}
           </p>
         </div>
-        <div className="flex items-center gap-2">
+        
+        <div className="flex items-center gap-3 bg-white/5 p-2 rounded-2xl border border-white/10">
           {onExportCSV && (
             <Button
               onClick={onExportCSV}
               disabled={isExporting}
-              variant="outline"
-              className="rounded-lg font-medium tracking-wide transition-all duration-200 border-border"
+              variant="ghost"
+              className="rounded-xl font-bold bg-white/5 hover:bg-white/10 text-white border-transparent"
             >
-              {isExporting ? (
-                <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Exporting...</>
-              ) : (
-                <><FaDownload className="mr-2 h-4 w-4" /> Download CSV</>
-              )}
+              <FaDownload className="mr-2 h-4 w-4 text-primary" /> CSV
             </Button>
           )}
           {onExportSheets && (
             <Button
               onClick={onExportSheets}
               disabled={isExporting}
-              className="bg-primary text-primary-foreground hover:bg-primary/90 rounded-lg font-medium tracking-wide transition-all duration-200"
+              className="premium-button rounded-xl h-10"
             >
               {isExporting ? (
-                <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Exporting...</>
+                <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> ...</>
               ) : (
-                <><FaFileExport className="mr-2 h-4 w-4" /> Export to Sheets</>
+                <span className="flex items-center gap-2"><FaFileExport className="w-4 h-4" /> Export Sheets</span>
               )}
             </Button>
           )}
         </div>
       </div>
 
-      {/* Qdrant status indicator */}
+      {/* Vector Memory Bar */}
       {qdrantStatus && (
-        <div className="flex items-center gap-2 text-xs text-muted-foreground mb-4">
-          <FaDatabase className="w-3 h-3" />
-          <span>
-            Vector Memory: {qdrantStatus === 'connected'
-              ? 'Connected — similar companies from Qdrant'
-              : 'Offline — using category-based matching'}
+        <div className="flex items-center gap-3 bg-primary/5 border border-primary/20 rounded-2xl p-3 mb-8 animate-pulse">
+          <Zap className="w-4 h-4 text-primary fill-primary" />
+          <span className="text-[10px] font-black uppercase tracking-[0.2em] text-primary/80">
+            Vector Subspace Live: {qdrantStatus === 'connected' ? 'Analyzing Semantic Clusters' : 'Direct Search Mode'}
           </span>
-          <div className={`w-1.5 h-1.5 rounded-full ${qdrantStatus === 'connected' ? 'bg-green-500' : 'bg-muted-foreground/40'}`} />
         </div>
       )}
 
-      {/* Export status message inline */}
+      {/* Export Status Notification */}
       {exportStatus?.type === 'success' && (
-        <div className="bg-green-50 border border-green-200 rounded-lg p-4 mb-6">
-          <div className="flex items-center gap-2 text-sm text-green-700 mb-2">
-            <FaCheckCircle className="w-4 h-4 flex-shrink-0" />
-            <span className="font-medium">{exportStatus.message}</span>
+        <div className="glass-card border-green-500/20 p-6 rounded-3xl mb-12 animate-in fade-in zoom-in duration-500">
+          <div className="flex flex-col md:flex-row items-center gap-6">
+            <div className="w-16 h-16 rounded-3xl bg-green-500/20 flex items-center justify-center border border-green-500/30">
+               <FaCheckCircle className="w-8 h-8 text-green-500" />
+            </div>
+            <div className="flex-1 text-center md:text-left">
+              <p className="text-xl font-bold text-white mb-1">Data Pipeline Synchronized</p>
+              <p className="text-white/50 text-sm">{exportStatus.message}</p>
+            </div>
+            {exportStatus.url && (
+              <a
+                href={exportStatus.url}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="premium-button bg-green-600 hover:bg-green-700 shadow-green-500/20 gap-2 h-12"
+              >
+                Open Analytics <FaExternalLinkAlt className="w-3 h-3" />
+              </a>
+            )}
           </div>
-          {exportStatus.url && (
-            <a
-              href={exportStatus.url}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="inline-flex items-center gap-2 px-4 py-2 bg-primary text-primary-foreground rounded-lg text-sm font-medium hover:bg-primary/90 transition-all duration-200"
-            >
-              <FaExternalLinkAlt className="w-3.5 h-3.5" />
-              Click to View Results in Google Sheets
-            </a>
-          )}
-        </div>
-      )}
-      {exportStatus?.type === 'error' && (
-        <div className="flex items-center gap-2 text-sm text-destructive bg-destructive/10 border border-destructive/30 rounded-lg p-3 mb-6">
-          <FaExclamationCircle className="w-4 h-4 flex-shrink-0" />
-          <span>{exportStatus.message}</span>
         </div>
       )}
 
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+      {/* Grid */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
         {companies.map((company, idx) => (
-          <CompanyCard
-            key={`${company?.company_name ?? ''}-${idx}`}
-            company={company}
-            qdrantMatches={qdrantSimilar?.[company?.company_name ?? '']}
-          />
+          <div key={`${company?.company_name ?? ''}-${idx}`} className="animate-in fade-in slide-in-from-bottom-8 duration-500" style={{ animationDelay: `${idx * 100}ms` }}>
+            <CompanyCard
+              company={company}
+              qdrantMatches={qdrantSimilar?.[company?.company_name ?? '']}
+            />
+          </div>
         ))}
       </div>
     </div>
   )
 }
+

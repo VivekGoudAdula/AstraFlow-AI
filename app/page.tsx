@@ -12,32 +12,10 @@ import MarketPatterns from './sections/MarketPatterns'
 import type { Company } from './sections/ResultsGrid'
 import { Badge } from '@/components/ui/badge'
 import { toast } from 'sonner'
-
-// --- Theme ---
-const THEME_VARS = {
-  '--background': '35 29% 95%',
-  '--foreground': '30 22% 14%',
-  '--card': '35 29% 92%',
-  '--card-foreground': '30 22% 14%',
-  '--primary': '27 61% 26%',
-  '--primary-foreground': '35 29% 98%',
-  '--secondary': '35 20% 88%',
-  '--secondary-foreground': '30 22% 18%',
-  '--accent': '43 75% 38%',
-  '--accent-foreground': '35 29% 98%',
-  '--muted': '35 15% 85%',
-  '--muted-foreground': '30 20% 45%',
-  '--border': '27 61% 26%',
-  '--input': '35 15% 75%',
-  '--ring': '27 61% 26%',
-  '--destructive': '0 84% 60%',
-  '--radius': '0.5rem',
-} as React.CSSProperties
+import { Cpu, Database, Network, ShieldCheck, Sparkles, Zap, BrainCircuit, Globe } from 'lucide-react'
 
 // --- Agent IDs ---
 const COORDINATOR_AGENT_ID = '69c8e2962233a0528b6d6110'
-
-// --- Placeholder removed ---
 
 // --- Helper: Parse agent result (handles string or object) ---
 function parseAgentResult(result: AIAgentResponse): any {
@@ -77,7 +55,6 @@ function fixSourceUrls(source: any): string[] {
     rawLinks = source.map(s => String(s).trim())
   } else {
     const str = String(source).trim()
-    // Handle stringified JSON array
     if (str.startsWith('[') && str.endsWith(']')) {
       try {
         const parsed = JSON.parse(str)
@@ -88,25 +65,21 @@ function fixSourceUrls(source: any): string[] {
         rawLinks = [str]
       }
     } else {
-      // Split by ' | ' or ','
       rawLinks = str.split(/[|,]/).map(s => s.trim()).filter(Boolean)
     }
   }
 
-  // Clean and filter (must start with http, max 3)
   return rawLinks
-    .map(link => link.replace(/^["']+|["']+$/g, '')) // Remove rogue quotes
+    .map(link => link.replace(/^["']+|["']+$/g, '')) 
     .filter(link => link.startsWith('http'))
     .slice(0, 3)
 }
 
-// --- Helper: LinkedIn Discovery via server-side route (name OR company-only Google search) ---
 // --- Helper: LinkedIn & Email Discovery via server-side route ---
 async function findLinkedInWithApify(name: string, company: string, role: string = 'founder'): Promise<{ profileUrl: string; email: string }> {
   if (!company || company.length < 2) return { profileUrl: 'Not specified', email: 'Not specified' }
   const cleanName = (name && name !== 'Not specified' && name.length >= 2) ? name : ''
   try {
-    console.log(`🔍 [Apify Discovery] role="${role}" name="${cleanName || 'NONE'}" company="${company}"`)
     const res = await fetch('/api/linkedin', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -117,12 +90,8 @@ async function findLinkedInWithApify(name: string, company: string, role: string
     const profileUrl = (data?.profileUrl && data.profileUrl.includes('linkedin.com/in/')) ? data.profileUrl : 'Not specified'
     const email = (data?.email && data.email.includes('@')) ? data.email : 'Not specified'
     
-    if (profileUrl !== 'Not specified') console.log(`✅ [Apify Discovery] Found ${role}: ${profileUrl}`)
-    if (email !== 'Not specified') console.log(`📧 [Apify Discovery] Found ${role} Email: ${email}`)
-
     return { profileUrl, email }
   } catch (err) {
-    console.error(`❌ [Apify Discovery] Error (${role}):`, err)
     return { profileUrl: 'Not specified', email: 'Not specified' }
   }
 }
@@ -143,11 +112,11 @@ class ErrorBoundary extends React.Component<
     if (this.state.hasError) {
       return (
         <div className="min-h-screen flex items-center justify-center bg-background text-foreground">
-          <div className="text-center p-8 max-w-md">
-            <h2 className="text-xl font-semibold mb-2">Something went wrong</h2>
-            <p className="text-muted-foreground mb-4 text-sm">{this.state.error}</p>
-            <button onClick={() => this.setState({ hasError: false, error: '' })} className="px-4 py-2 bg-primary text-primary-foreground rounded-md text-sm">
-              Try again
+          <div className="text-center p-8 max-w-md glass-card rounded-3xl">
+            <h2 className="text-2xl font-black mb-2 text-white">System Breach</h2>
+            <p className="text-white/40 mb-6 text-sm">{this.state.error}</p>
+            <button onClick={() => this.setState({ hasError: false, error: '' })} className="premium-button">
+              Reboot Terminal
             </button>
           </div>
         </div>
@@ -160,18 +129,13 @@ class ErrorBoundary extends React.Component<
 // --- Helper: Domain Deriver & Email Generator ---
 function deriveDomain(name: string, sourceUrls: string[]): string {
   if (!name || name === 'Not specified') return ''
-  
-  // Try to extract from source URLs first
   for (const url of sourceUrls) {
     try {
       const hostname = new URL(url).hostname.replace('www.', '')
-      // Basic check: if it's a major news site, skip it
       const newsSites = ['techcrunch.com', 'bloomberg.com', 'venturebeat.com', 'crunchbase.com', 'prnewswire.com', 'globenewswire.com', 'news.crunchbase.com']
       if (!newsSites.includes(hostname)) return hostname
     } catch { /* skip */ }
   }
-
-  // Fallback: simple slugification (best effort)
   return name.toLowerCase().replace(/[^a-z0-9]/g, '') + '.ai' 
 }
 
@@ -198,11 +162,9 @@ export default function Page() {
   const [error, setError] = useState('')
   const [activeAgentId, setActiveAgentId] = useState<string | null>(null)
 
-  // Qdrant state
   const [qdrantSimilar, setQdrantSimilar] = useState<Record<string, SimilarCompanyFromQdrant[]>>({})
   const [qdrantStatus, setQdrantStatus] = useState<string>('')
 
-  // Export state
   const [isExporting, setIsExporting] = useState(false)
   const [exportStatus, setExportStatus] = useState<{ type: 'success' | 'error' | null; message: string; url?: string }>({ type: null, message: '' })
 
@@ -216,16 +178,13 @@ export default function Page() {
     setQdrantSimilar({})
     setQdrantStatus('')
     setExportStatus({ type: null, message: '' })
-    setLoadingStep('Searching Google for source links...')
+    setLoadingStep('Initializing neural search...')
     setActiveAgentId(COORDINATOR_AGENT_ID)
 
-    const stepTimer1 = setTimeout(() => setLoadingStep('Extracting company details...'), 8000)
-    const stepTimer2 = setTimeout(() => setLoadingStep('Enriching funding profiles...'), 18000)
+    const stepTimer1 = setTimeout(() => setLoadingStep('Extracting entity parameters...'), 8000)
+    const stepTimer2 = setTimeout(() => setLoadingStep('Resolving professional vectors...'), 18000)
 
     try {
-      console.log('🚀 [Scout Engine] Starting Scan for:', searchQuery)
-
-      // 🔍 1. PRE-FLOW: Fetch verified Google Search links
       let finalLinks = 'Not specified'
       try {
         const searchRes = await fetch('/api/search', {
@@ -236,15 +195,13 @@ export default function Page() {
         const searchData = await searchRes.json()
         if (searchData.success && searchData.links?.length > 0) {
           finalLinks = searchData.links.join(' | ')
-          console.log('🔗 [Scout Engine] Injected Verified Links:', finalLinks)
         }
       } catch (err) {
-        console.error('⚠️ [Scout Engine] Pre-search failed:', err)
+        console.error('⚠️ Search failed:', err)
       }
 
-      setLoadingStep('Researching market data...')
+      setLoadingStep('Infiltrating market source streams...')
 
-      // 🧠 2. PROMPT: Update with strict source rules and injected links
     const promptInstructions = `
 Identify recently funded AI companies for: "${searchQuery}".
 Return ONLY high-quality results with LIVE, VERIFIED links.
@@ -253,195 +210,74 @@ SOURCE OF PROOF RULE (STRICT):
 - search_results: ${finalLinks}
 - ONLY use links from the "search_results" list provided above.
 - DO NOT generate, modify, or combine URLs.
-- DO NOT create TechCrunch links manually.
 - Pick 1–3 most relevant links for each company.
 - If no valid link exists → return "Not specified".
 - Output links as a clean string separated by " | ".
-  Example: https://bloomberg.com/... | https://venturebeat.com/...
-- NEVER return broken or partial links.
 
 EMAIL RULE (UPDATED):
 - If a direct email is found in sources → use it.
 - If NOT found:
     → derive company domain (e.g., laminar.ai)
     → generate a SAFE public email using: contact@domain OR hello@domain OR info@domain
-- NEVER guess personal emails (like founder@gmail.com).
-- NEVER hallucinate random emails.
-- If domain not found → return "Not specified".
 
-MARKETING CONTACT RULE:
-- Try to find a marketing or community manager from search results.
-- Look for roles like: "Marketing Manager", "Community Manager", "Growth Manager", "Developer Relations".
-- ONLY return LinkedIn if it appears in search results and the role matches.
-- If no clear match → "Not specified".
-- DO NOT guess roles or assign random employees.
-
-MARKETING LINKEDIN RULE:
-- Only return LinkedIn profile if the role clearly includes: marketing, community, growth, or developer relations.
-- Must be verifiable from search results.
-- If no valid match → "Not specified".
-- NEVER assign a founder or random employee to this role.
-
--------------------------
 STRICT HUMAN-CENTRIC EXTRACTION (MANDATORY)
--------------------------
 1. FOUNDER IDENTITY: You MUST identify the REAL FULL NAME of the Founder/CEO.
-   - Key to use: "founder_name"
-2. MARKETING IDENTITY: Identify the REAL FULL NAME of the Head of Growth or Marketing.
-   - Look for: Marketing Manager, Community Manager, Growth Lead, DevRel.
-   - Key to use: "marketing_manager_name"
-3. NO GUESSING: DO NOT generate LinkedIn URLs. ONLY return the REAL Names.
-4. "source_of_proof": MUST be the clean string from search inputs.
-5. "email": MUST follow the EMAIL RULE (UPDATED) above for the company/founder.
-
-EXAMPLE OUTPUT:
-{
-  "companies": [
-    {
-      "company_name": "OpenAI",
-      "founder_name": "Sam Altman",
-      "marketing_manager_name": "Not specified",
-      "email": "contact@openai.com",
-      "date_founded": "2015",
-      "funding_total": "$11B+",
-      "latest_funding": "$6.6B led by Thrive Capital, Oct 2024",
-      "source_of_proof": "https://www.bloomberg.com/news/articles/2024-10-02/openai-funding-round | https://news.crunchbase.com/ai/openai-funding/"
-    }
-  ],
-  "total_companies_found": 3,
-  "pipeline_status": "Human Intelligence Scan"
-}
+2. NO GUESSING: DO NOT generate LinkedIn URLs. ONLY return the REAL Names.
+3. "source_of_proof": MUST be the clean string from search inputs.
 Return ONLY JSON.
 `
 
       const result = await callAIAgent(promptInstructions, COORDINATOR_AGENT_ID)
-      
-      const rawCount = result?.response?.result?.length || 0
-      console.log('📥 [Scout Engine] Agent Result received:', { success: result.success, rawCount })
-
       clearTimeout(stepTimer1)
       clearTimeout(stepTimer2)
 
       if (result.success) {
         const data = parseAgentResult(result)
-        console.log('🧩 [Scout Engine] Parsed Data:', data)
-
         let extracted = extractCompanies(data)
         
-        // 🧪 Multi-key Name Extraction (check all possible field variants)
         extracted = extracted.map(c => {
           const raw = c as any
-          // Check ALL possible field name variants the agent might use
-          const fName: string = (
-            raw.founder_name || 
-            raw.founder || 
-            raw.ceo_name || 
-            raw.ceo || 
-            raw.founder_ceo ||
-            raw.founders ||
-            ''
-          ).trim()
-
-          const mName: string = (
-            raw.marketing_manager_name || 
-            raw.marketing_manager ||
-            raw.head_of_marketing ||
-            raw.growth_lead ||
-            ''
-          ).trim()
-
-          // Validate: reject placeholder values
-          const cleanName = (n: string) => {
-            if (!n || n === 'Not specified' || n.toLowerCase() === 'not specified') return ''
-            return n
-          }
-
+          const fName: string = (raw.founder_name || raw.founder || raw.ceo_name || raw.ceo || '').trim()
+          const mName: string = (raw.marketing_manager_name || raw.marketing_manager || '').trim()
+          const cleanName = (n: string) => (!n || n.toLowerCase() === 'not specified') ? '' : n
           return { ...c, founder_name: cleanName(fName), marketing_manager_name: cleanName(mName) }
         })
-
-        console.log(`📋 [Scout Engine] Processing ${extracted.length} companies. Founder names: ${extracted.map(c => `"${c.founder_name || 'NONE'}"`).join(', ')}`)
-
 
         extracted = extracted.map(c => ({
           ...c,
           founder_linkedin: isValidLinkedIn(c.founder_linkedin || '') ? c.founder_linkedin : 'Not specified',
-          marketing_community_manager_linkedin: isValidLinkedIn(c.marketing_community_manager_linkedin || '') ? c.marketing_community_manager_linkedin : 'Not specified',
           funding_total: normalizeFunding(c.funding_total || ''),
           email: (c.email && c.email.includes('@')) ? c.email : 'Not specified',
           source_of_proof: fixSourceUrls(c.source_of_proof) 
         }))
 
-        // 🥇 STEP 2.5 — ENRICHMENT (Apify LinkedIn Resolution)
-        setLoadingStep('Resolving professional profiles...')
-        console.log('⚡ [Scout Engine] Starting Apify Loop...')
-
+        setLoadingStep('Resolving synaptic profiles...')
         const enriched: Company[] = await Promise.all(extracted.map(async (c: Company) => {
           let f_linkedin = c.founder_linkedin
           let f_email = c.email
-          let m_linkedin = c.marketing_community_manager_linkedin
-          let m_email = c.marketing_community_manager_email
 
-          // Always try to resolve founder — even if name is empty, the server route will try
           if (!isValidLinkedIn(f_linkedin || '')) {
-            const nameToSearch = c.founder_name && c.founder_name !== 'Not specified' ? c.founder_name : ''
-            console.log(`🔎 [Scout Engine] Resolving Founder for "${c.company_name}" with name: "${nameToSearch || 'UNKNOWN'}"`)
-            const discovery = await findLinkedInWithApify(nameToSearch, c.company_name || '')
+            const discovery = await findLinkedInWithApify(c.founder_name || '', c.company_name || '')
             f_linkedin = discovery.profileUrl
-            if (discovery.email !== 'Not specified' && discovery.email.includes('@')) f_email = discovery.email
+            if (discovery.email !== 'Not specified') f_email = discovery.email
           }
 
-          if (!isValidLinkedIn(m_linkedin || '') && c.marketing_manager_name && c.marketing_manager_name !== 'Not specified') {
-            console.log(`🔎 [Scout Engine] Resolving Marketing for "${c.company_name}": "${c.marketing_manager_name}"`)
-            const discovery = await findLinkedInWithApify(c.marketing_manager_name!, c.company_name || '', 'marketing_manager')
-            m_linkedin = discovery.profileUrl
-            if (discovery.email !== 'Not specified' && discovery.email.includes('@')) m_email = discovery.email
-          }
-
-          // 🔥 FALLBACK ENRICHMENT: Generate "safe" public emails if still missing
-          if (!f_email || f_email === 'Not specified' || !f_email.includes('@')) {
+          if (!f_email || f_email === 'Not specified') {
             f_email = generateFallbackEmail(c.company_name || '', c.source_of_proof || [])
           }
 
-          if (!m_email || m_email === 'Not specified' || !m_email.includes('@')) {
-            m_email = generateMarketingEmail(c.company_name || '', c.source_of_proof || [])
-          }
-
-          return {
-            ...c,
-            founder_linkedin: f_linkedin,
-            email: f_email,
-            marketing_community_manager_linkedin: m_linkedin,
-            marketing_community_manager_email: m_email
-          }
+          return { ...c, founder_linkedin: f_linkedin, email: f_email }
         }))
 
-        console.log('✨ [Scout Engine] Final Enriched Results:', enriched)
+        const highIntegrityCompanies = enriched.filter(c => !!c.company_name && c.company_name !== 'Not specified' && !!c.source_of_proof?.length)
+        setCompanies(highIntegrityCompanies.length > 0 ? highIntegrityCompanies : enriched)
+        setTotalFound(highIntegrityCompanies.length)
+        setPipelineStatus(data?.pipeline_status ?? 'Neural Link Stabilized')
 
-        // 🥉 STEP 3 — SMART QUALITY FILTER (High Integrity)
-        const highIntegrityCompanies = enriched.filter(c => {
-          const hasName = !!c.company_name && c.company_name !== 'Not specified'
-          const hasSource = !!c.source_of_proof && c.source_of_proof.length > 0
-          return hasName && hasSource
-        })
-
-        if (highIntegrityCompanies.length === 0 && rawCount > 0) {
-          toast.warning("Verification failed for all companies. Showing raw data instead.")
-          setCompanies(enriched)
-          setTotalFound(rawCount)
-        } else {
-          setCompanies(highIntegrityCompanies)
-          setTotalFound(highIntegrityCompanies.length)
-        }
-
-        setPipelineStatus(data?.pipeline_status ?? 'Deep Scan Complete')
-
-        // After getting companies, store in Qdrant and find similar (async, non-blocking)
-        const toStore = highIntegrityCompanies.length > 0 ? highIntegrityCompanies : enriched
-        if (toStore.length > 0) {
-          setLoadingStep('Querying vector memory...')
+        if (enriched.length > 0) {
+          setLoadingStep('Syncing with vector memory...')
           try {
-            const qdrantResult = await storeAndFindSimilar(
-              toStore.map(c => ({
+            const qdrantResult = await storeAndFindSimilar(enriched.map(c => ({
                 company_name: c.company_name || 'Not specified',
                 funding_total: c.funding_total || 'Not specified',
                 latest_funding: c.latest_funding || 'Not specified',
@@ -455,8 +291,7 @@ Return ONLY JSON.
                 marketing_community_manager_linkedin: c.marketing_community_manager_linkedin || 'Not specified',
                 marketing_community_manager_email: c.marketing_community_manager_email || 'Not specified',
                 trending_flag: c.trending_flag || false,
-              }))
-            )
+            })))
             setQdrantSimilar(qdrantResult)
             setQdrantStatus('connected')
           } catch {
@@ -464,11 +299,9 @@ Return ONLY JSON.
           }
         }
       } else {
-        setError(result?.error ?? 'Intelligence scan failed. Please try again.')
+        setError(result?.error ?? 'Neural scan failed.')
       }
     } catch (e) {
-      clearTimeout(stepTimer1)
-      clearTimeout(stepTimer2)
       setError(e instanceof Error ? e.message : 'An unexpected error occurred.')
     } finally {
       setIsLoading(false)
@@ -476,23 +309,15 @@ Return ONLY JSON.
     }
   }, [searchQuery])
 
-  const SHEET_URL = 'https://docs.google.com/spreadsheets/d/1V7YVeOjM5RvRP7X8lUyFaH6b_oE2CmPkSXbVV5gQ14Y/edit?usp=sharing'
-
-  // Download CSV
   const handleDownloadCSV = useCallback(async () => {
-    const toExport = displayCompanies
-    if (!Array.isArray(toExport) || toExport.length === 0) return
-
+    if (displayCompanies.length === 0) return
     setIsExporting(true)
-    setExportStatus({ type: null, message: '' })
-
     try {
       const res = await fetch('/api/export-sheets', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ companies: toExport, mode: 'csv' }),
+        body: JSON.stringify({ companies: displayCompanies, mode: 'csv' }),
       })
-
       if (res.ok) {
         const blob = await res.blob()
         const url = URL.createObjectURL(blob)
@@ -503,66 +328,42 @@ Return ONLY JSON.
         a.click()
         document.body.removeChild(a)
         URL.revokeObjectURL(url)
-        setExportStatus({
-          type: 'success',
-          message: `Downloaded ${toExport.length} companies as CSV.`,
-        })
-      } else {
-        setExportStatus({ type: 'error', message: 'CSV export failed.' })
       }
     } catch (e) {
-      setExportStatus({ type: 'error', message: e instanceof Error ? e.message : 'Export failed.' })
+      toast.error('CSV export failed')
     } finally {
       setIsExporting(false)
     }
   }, [displayCompanies])
 
-  // Export directly to Google Sheets — creates a NEW sheet via /api/export
   const handleExportToSheets = useCallback(async () => {
-    const toExport = displayCompanies
-    if (!Array.isArray(toExport) || toExport.length === 0) return
-
+    if (displayCompanies.length === 0) return
     setIsExporting(true)
-    setExportStatus({ type: null, message: '' })
-    const toastId = toast.loading('Creating your Google Sheet...')
-
+    const toastId = toast.loading('Synchronizing Cloud Sheets...')
     try {
       const res = await fetch('/api/export', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ companies: toExport }),
+        body: JSON.stringify({ companies: displayCompanies }),
       })
-
       const data = await res.json()
-
       if (data.success && data.url) {
-        setExportStatus({
-          type: 'success',
-          message: `Google Sheet created successfully with ${toExport.length} companies.`,
-          url: data.url,
-        })
-        toast.success('Google Sheet created successfully', { id: toastId })
-        // Open the sheet in a new tab as requested
+        setExportStatus({ type: 'success', message: 'Cloud synchronization complete', url: data.url })
+        toast.success('Sheets updated', { id: toastId })
         window.open(data.url, "_blank")
       } else {
-        const errorMsg = data.error || 'Google Sheets export failed.'
-        setExportStatus({ type: 'error', message: errorMsg })
-        toast.error(errorMsg, { id: toastId })
+        toast.error('Sync failed', { id: toastId })
       }
     } catch (e) {
-      const errorMsg = e instanceof Error ? e.message : 'Export failed.'
-      setExportStatus({ type: 'error', message: errorMsg })
-      toast.error(errorMsg, { id: toastId })
+      toast.error('Export errored', { id: toastId })
     } finally {
       setIsExporting(false)
     }
   }, [displayCompanies])
 
-  // Toggle sample data removed
-
   return (
     <ErrorBoundary>
-      <div style={THEME_VARS} className="min-h-screen bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-background via-background to-secondary/20 text-foreground font-sans selection:bg-primary/20">
+      <div className="min-h-screen bg-background text-foreground font-sans selection:bg-primary/30 mesh-gradient">
         <Header
           searchQuery={searchQuery}
           setSearchQuery={setSearchQuery}
@@ -570,93 +371,113 @@ Return ONLY JSON.
           isLoading={isLoading}
         />
 
-        {/* Error State */}
+        {/* Status Indicators */}
         {error && (
           <div className="max-w-3xl mx-auto px-6 py-4">
-            <div className="bg-destructive/10 border border-destructive/30 rounded-lg p-4 text-center">
-              <p className="text-sm text-destructive mb-2">{error}</p>
-              <button onClick={handleSearch} className="text-sm underline text-destructive hover:text-destructive/80 transition-colors duration-200">
-                Retry scan
+            <div className="glass-card border-destructive/20 p-6 flex items-center justify-between rounded-3xl">
+              <p className="text-sm text-destructive font-bold uppercase tracking-widest">{error}</p>
+              <button onClick={handleSearch} className="premium-button bg-destructive/10 text-destructive border-destructive/20 h-10 px-4">
+                RETRY
               </button>
             </div>
           </div>
         )}
 
-        {/* Loading State */}
-        {isLoading && <LoadingState loadingStep={loadingStep} />}
-
-        {/* Empty State */}
-        {!isLoading && displayCompanies.length === 0 && !error && (
-          <div className="max-w-xl mx-auto px-6 py-16 text-center">
-            <div className="bg-card border border-border rounded-lg p-10">
-              <p className="font-serif text-2xl text-foreground mb-3 tracking-wide">Ready to explore</p>
-              <p className="text-muted-foreground text-sm leading-relaxed">
-                Enter a search query above to scan the AI developer tools market. The intelligence engine will research, extract, and enrich funding data from across the web.
-              </p>
+        {/* Main Content Flow */}
+        <div className="relative z-10 transition-all duration-500">
+          {isLoading ? (
+            <LoadingState loadingStep={loadingStep} />
+          ) : displayCompanies.length === 0 && !error ? (
+            <div className="max-w-xl mx-auto px-6 py-24 text-center">
+              <div className="glass-card border-white/5 p-12 rounded-[3rem] group">
+                <div className="w-20 h-20 rounded-3xl bg-white/5 flex items-center justify-center mx-auto mb-8 border border-white/10 group-hover:scale-110 transition-transform">
+                   <BrainCircuit className="w-10 h-10 text-primary animate-pulse" />
+                </div>
+                <h3 className="text-3xl font-black text-white mb-4 tracking-tighter">TERMINAL READY</h3>
+                <p className="text-white/40 text-sm leading-relaxed max-w-sm mx-auto font-medium">
+                  Input a market niche to activate the <span className="text-primary">Intelligence Extraction Pipeline</span>. Current systems: Qdrant, Apify, Google Search.
+                </p>
+              </div>
             </div>
-          </div>
-        )}
+          ) : (
+            <>
+              <MarketPatterns companies={displayCompanies} />
+              <ResultsGrid
+                companies={displayCompanies}
+                totalFound={totalFound}
+                pipelineStatus={pipelineStatus}
+                onExportCSV={handleDownloadCSV}
+                onExportSheets={handleExportToSheets}
+                isExporting={isExporting}
+                exportStatus={exportStatus}
+                qdrantSimilar={qdrantSimilar}
+                qdrantStatus={qdrantStatus}
+              />
+            </>
+          )}
+        </div>
 
-        {/* Market Pattern Detection */}
-        {!isLoading && displayCompanies.length > 0 && (
-          <MarketPatterns companies={displayCompanies} />
-        )}
+        {/* Global Agent Control Panel */}
+        <div className="max-w-7xl mx-auto px-6 pb-20 mt-12" id="about">
+          <div className="glass-card border-white/5 rounded-[3rem] p-10 overflow-hidden relative">
+            <div className="absolute top-0 left-0 w-full h-[2px] bg-gradient-to-r from-transparent via-primary/50 to-transparent" />
+            
+            <div className="flex flex-col md:flex-row items-center justify-between gap-8 mb-12">
+               <div>
+                 <h4 className="text-2xl font-black text-white tracking-tighter uppercase mb-1">Agent <span className="text-primary italic">Status</span></h4>
+                 <p className="text-white/30 text-xs font-bold tracking-widest">REAL-TIME SYSTEM MONITORING</p>
+               </div>
+               <div className="flex gap-2">
+                 <Badge variant="outline" className="rounded-full border-green-500/20 bg-green-500/5 text-green-500 gap-2 px-4 py-1.5 font-bold uppercase text-[10px]">
+                   <span className="w-2 h-2 rounded-full bg-green-500 animate-ping" /> Global Hub Active
+                 </Badge>
+               </div>
+            </div>
 
-        {/* Results with inline Export button */}
-        {!isLoading && displayCompanies.length > 0 && (
-          <ResultsGrid
-            companies={displayCompanies}
-            totalFound={totalFound}
-            pipelineStatus={pipelineStatus}
-            onExportCSV={handleDownloadCSV}
-            onExportSheets={handleExportToSheets}
-            isExporting={isExporting}
-            exportStatus={exportStatus}
-            qdrantSimilar={qdrantSimilar}
-            qdrantStatus={qdrantStatus}
-          />
-        )}
-
-        {/* Agent Status Section */}
-        <div className="max-w-5xl mx-auto px-6 pb-8" id="about">
-          <div className="bg-card border border-border rounded-lg p-6 mb-8">
-            <h4 className="font-serif text-lg font-bold text-foreground tracking-wide mb-4">Powered by AI Agents</h4>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
-              <div className="flex items-center gap-3">
-                <div className={`w-2.5 h-2.5 rounded-full flex-shrink-0 ${activeAgentId === COORDINATOR_AGENT_ID ? 'bg-green-500 animate-pulse' : 'bg-muted-foreground/40'}`} />
-                <div className="min-w-0">
-                  <p className="text-sm font-medium text-foreground">Funding Intelligence Coordinator</p>
-                  <p className="text-xs text-muted-foreground">Orchestrates research, extraction, and enrichment pipeline</p>
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+              {[
+                { 
+                  name: 'Intelligence Coordinator', 
+                  desc: 'Pipeline orchestration & neural logic', 
+                  icon: Sparkles, 
+                  active: activeAgentId === COORDINATOR_AGENT_ID,
+                  color: 'text-primary'
+                },
+                { 
+                  name: 'Apify Discovery', 
+                  desc: 'Real-time social profile verification', 
+                  icon: Globe, 
+                  active: loadingStep.includes('Resolving') && isLoading,
+                  color: 'text-accent'
+                },
+                { 
+                  name: 'Qdrant Persistence', 
+                  desc: 'Vector memory & semantic mapping', 
+                  icon: Database, 
+                  active: loadingStep.includes('Syncing') && isLoading,
+                  color: 'text-purple-400'
+                },
+                { 
+                  name: 'Cloud Infrastructure', 
+                  desc: 'Production-grade sheets integration', 
+                  icon: ShieldCheck, 
+                  active: isExporting,
+                  color: 'text-orange-400'
+                }
+              ].map((agent, i) => (
+                <div key={i} className={`p-6 rounded-[2rem] border transition-all duration-300 ${agent.active ? 'bg-white/10 border-white/20' : 'bg-white/5 border-transparent'}`}>
+                  <div className={`w-12 h-12 rounded-2xl bg-white/5 flex items-center justify-center mb-6 border border-white/10 ${agent.active ? agent.color : 'text-white/20'}`}>
+                    <agent.icon className="w-6 h-6" />
+                  </div>
+                  <p className="text-sm font-black text-white mb-2 uppercase tracking-tight">{agent.name}</p>
+                  <p className="text-[11px] text-white/30 font-medium leading-relaxed">{agent.desc}</p>
+                  {agent.active && (
+                    <div className="mt-4 flex items-center gap-2">
+                      <span className="text-[8px] font-black uppercase text-primary animate-pulse">Processing Block...</span>
+                    </div>
+                  )}
                 </div>
-                {activeAgentId === COORDINATOR_AGENT_ID && <Badge variant="secondary" className="text-xs flex-shrink-0">Active</Badge>}
-              </div>
-
-              <div className="flex items-center gap-3">
-                <div className={`w-2.5 h-2.5 rounded-full flex-shrink-0 ${(loadingStep === 'Resolving professional profiles...' && isLoading) ? 'bg-blue-500 animate-pulse' : 'bg-muted-foreground/40'}`} />
-                <div className="min-w-0">
-                  <p className="text-sm font-medium text-foreground">Apify Discovery Engine</p>
-                  <p className="text-xs text-muted-foreground">Executes intelligent queries for real-time social profile verification</p>
-                </div>
-                {(loadingStep === 'Resolving professional profiles...' && isLoading) && <Badge variant="secondary" className="text-xs flex-shrink-0">Active</Badge>}
-              </div>
-
-              <div className="flex items-center gap-3">
-                <div className={`w-2.5 h-2.5 rounded-full flex-shrink-0 ${(loadingStep === 'Querying vector memory...' && isLoading) ? 'bg-purple-500 animate-pulse' : 'bg-muted-foreground/40'}`} />
-                <div className="min-w-0">
-                  <p className="text-sm font-medium text-foreground">Qdrant Vector Memory</p>
-                  <p className="text-xs text-muted-foreground">Performs high-dimensional semantic clustering to identify market competitors</p>
-                </div>
-                {(loadingStep === 'Querying vector memory...' && isLoading) && <Badge variant="secondary" className="text-xs flex-shrink-0">Active</Badge>}
-              </div>
-
-              <div className="flex items-center gap-3">
-                <div className={`w-2.5 h-2.5 rounded-full flex-shrink-0 ${isExporting ? 'bg-orange-500 animate-pulse' : 'bg-muted-foreground/40'}`} />
-                <div className="min-w-0">
-                  <p className="text-sm font-medium text-foreground">Google Cloud API</p>
-                  <p className="text-xs text-muted-foreground">Direct integration for production-grade Sheets export</p>
-                </div>
-                {isExporting && <Badge variant="secondary" className="text-xs flex-shrink-0">Active</Badge>}
-              </div>
+              ))}
             </div>
           </div>
         </div>
