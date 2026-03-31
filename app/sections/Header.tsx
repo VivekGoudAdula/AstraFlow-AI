@@ -47,20 +47,9 @@ export default function Header({ searchQuery, setSearchQuery, onSearch, isLoadin
       </nav>
 
       {/* Hero Section */}
-      <div className="max-w-5xl mx-auto px-6 pt-32 pb-20 text-center relative z-10">
-        <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full glass border-white/10 text-[10px] uppercase tracking-[0.2em] font-bold text-primary mb-8 animate-float">
-          <span className="relative flex h-2 w-2">
-            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-primary opacity-75"></span>
-            <span className="relative inline-flex rounded-full h-2 w-2 bg-primary"></span>
-          </span>
-          Next-Gen AI Funding Intelligence
-        </div>
-
-        <h2 className="text-6xl md:text-8xl font-black tracking-tighter leading-[0.9] mb-8">
-          <span className="block text-white">Scout. Enrich.</span>
-          <span className="block bg-clip-text text-transparent bg-gradient-to-r from-primary via-accent to-primary bg-[length:200%_auto] animate-[shimmer_4s_linear_infinite]">
-            Dominate Markets.
-          </span>
+      <div className="max-w-5xl mx-auto px-6 pt-24 pb-16 text-center relative z-10">
+        <h2 className="text-3xl sm:text-5xl md:text-7xl lg:text-8xl font-black tracking-tighter leading-tight mb-8 bg-clip-text text-transparent bg-gradient-to-r from-white via-primary/90 to-white bg-[length:200%_auto] animate-[shimmer_4s_linear_infinite] whitespace-nowrap">
+          AI Funding Intelligence
         </h2>
 
         <p className="text-white/60 md:text-xl text-lg leading-relaxed mb-12 max-w-2xl mx-auto font-light">

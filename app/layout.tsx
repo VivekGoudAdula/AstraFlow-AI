@@ -1,15 +1,19 @@
 import type { Metadata } from 'next'
-import { Inter } from 'next/font/google'
+import { Poppins } from 'next/font/google'
 import Script from 'next/script'
 import './globals.css'
 import { IframeLoggerInit } from '@/components/IframeLoggerInit'
 import ClientProviders from '@/components/ClientProviders'
 
-const inter = Inter({ subsets: ['latin'] })
+const poppins = Poppins({
+  subsets: ['latin'],
+  weight: ['300', '400', '500', '600', '700', '800', '900'],
+  variable: '--font-poppins',
+})
 
 export const metadata: Metadata = {
-  title: 'Next.js App',
-  description: 'Built with Next.js, React, and Tailwind CSS',
+  title: 'AI Funding Intelligence | AstraFlow AI',
+  description: 'Scout, enrich, and analyze high-velocity AI funding rounds with zero-hallucination data intelligence.',
   icons: {
     icon: '/lyzr.png',
   },
@@ -22,8 +26,8 @@ export default function RootLayout({
 }) {
   const isPaidUser = process.env.IS_PAID_USER === 'true'
   return (
-    <html lang="en" suppressHydrationWarning>
-      <body className={inter.className} suppressHydrationWarning>
+    <html lang="en" suppressHydrationWarning className={poppins.variable}>
+      <body className={`${poppins.className} antialiased`} suppressHydrationWarning>
         <IframeLoggerInit />
         <ClientProviders>
           {children}
