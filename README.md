@@ -1,79 +1,116 @@
-# ASTRAFLOW AI - AI Funding Scout & Intelligence Engine
-*(Lyzr x Qdrant Hackathon: Autonomous Ecosystems)*
+# 🛰️ ASTRAFLOW AI: The Neural Funding Scout
+### *Autonomous Startup Intelligence & Market Gravity Analysis*
+**[built for the Lyzr x Qdrant: Autonomous Ecosystems Hackathon]**
 
-An autonomous, high-integrity startup discovery pipeline built to analyze AI market trends and funding rounds without the hallucinations typical of LLMs. 
+---
 
-This engine acts as an automated venture scout: it takes a market hypothesis (e.g., "Recently funded AI developer tools"), uses **Lyzr Agents** to structure the market data, taps into **Qdrant Vector Memory** to find architectural and market similarities, and performs real-time internet verification via **Apify** to discover the true LinkedIn profiles of Founders and Marketing Leads.
+![AstraFlow AI Shield](https://img.shields.io/badge/Status-Hackathon_Grade-eb3b5a?style=for-the-badge&logo=rocket)
+![AI Agents](https://img.shields.io/badge/Agents-Lyzr_Orchestrated-3867ff?style=for-the-badge&logo=sparkles)
+![Vector DB](https://img.shields.io/badge/Memory-Qdrant_Cloud-20bf6b?style=for-the-badge&logo=qdrant)
+![Identity](https://img.shields.io/badge/Verification-Apify_Discovery-fa8231?style=for-the-badge&logo=google)
 
-## ✨ Core Features
+**AstraFlow AI** is a high-fidelity, autonomous intelligence engine designed to scout high-velocity AI funding rounds and analyze competitive market gravity. Unlike standard LLM tools, AstraFlow eliminates hallucinations by anchoring every insight in real-time verified data streams.
 
-1. **Hallucination-Free Extraction (Lyzr Agent)**  
-   Data orchestration is handled by a strictly-prompted Lyzr Agent that extracts factual funding metrics, recent PR announcements, and key stakeholders without guessing or generating fake URLs.
-   
-2. **Server-Side Identity Verification (Apify Integration)**  
-   Features a powerful dual-strategy fallback system to guarantee accurate contact details. Instead of blindly trusting LLM URL guesses, the backend securely interacts with Apify's Google Search scrapers to dynamically locate the exact LinkedIn profiles for company founders.
+---
 
-3. **Persistent Vector Memory (Qdrant)**  
-   Companies discovered are automatically profiled and embedded into a Qdrant vector database. This allows the system to highlight hidden market trends and suggest "Similar Companies" based on high-dimensional semantic similarity of their market category, funding stage, and value propositions.
+## 🏆 Why AstraFlow AI Wins
+Most "AI Scouts" hallucinate URLs and founder names. AstraFlow is engineered for **Institutional Integrity**:
+- **Zero-Hallucination Guardrails**: Cross-verifies every entity against real-time search results before presentation.
+- **Persistent Vector Memory**: Uses Qdrant to "remember" market clusters, surfacing hidden competitors across different scans.
+- **Autonomous Lead Enrichment**: Discovers verified LinkedIn profiles and generates domain-accurate fallback contacts automatically.
+- **Production-Ready UX**: A cinematic, glassmorphic dashboard built to "WOW" stakeholders at first glance.
 
-4. **Audit-Ready Data Export**  
-   Automatically packages verified prospects into a multi-column, clean dataset. Provides one-click exporting to local CSVs and direct integration to append rows to a Google Sheet for venture workflows.
+---
 
-## 🛠️ Technology Stack
+## 🧠 Neural Architecture Pipeline
 
-- **Frontend:** Next.js 14, React, Tailwind CSS, system component library (glassmorphism UI layout).
-- **Core AI Orchestration:** Lyzr Agent API.
-- **Vector Database / RAG:** Qdrant Cloud.
-- **Real-Time Web Scraping:** Apify API (Google Search Scraper).
-- **Data Integrations:** Google Sheets API (googleapis).
+```mermaid
+graph TD
+    User([Market Hypothesis]) --> LC[Lyzr Coordinator Agent]
+    LC --> GS[Google Search Integration]
+    GS --> Ext[Extraction Engine]
+    Ext --> AP[Apify Identity Resolution]
+    AP --> QM[Qdrant Semantic Mapping]
+    QM --> UI[Cinematic Dashboards]
+    UI --> EX[Sheets & CSV Synchronization]
 
-## 🚀 Getting Started
+    subgraph "The Intelligence Loop"
+    Ext
+    AP
+    QM
+    end
+```
 
-### 1. Prerequisites
-Ensure you have the following API credentials:
-- `LYZR_API_KEY`
-- `QDRANT_API_KEY` & `QDRANT_URL`
-- `APIFY_API_KEY`
-- Google Cloud Service Account JSON (`service-account.json`) for Sheets API
+---
 
-### 2. Installation
-Clone the repository and install dependencies:
+## ✨ Key Capabilities
+
+### 1. 🤖 Lyzr-Powered Orchestration 
+Our **Neural Coordinator** doesn't just "chat"—it orchestrates a multi-step investigation. It parses complex market queries (e.g., *"Generative AI tools with recent Seed rounds in LATAM"*), extracts structured entity data, and synthesizes "Why This Matters" insights for venture analysis.
+
+### 2. 🕳️ Qdrant Vector Memory & Gravity
+Every discovery is embedded as a high-dimensional vector in **Qdrant Cloud**. This enables:
+- **Semantic Similarity**: Instantly find related companies from previous scans.
+- **Market Overlap**: Detect when a new startup is encroaching on an existing niche.
+
+### 3. 🔎 Real-World Identity Resolution
+The system features an autonomous **Apify Discovery Bridge**. When the LLM finds a company name, AstraFlow triggers server-side scapers to find the *actual* verified LinkedIn profiles for Founders and Marketing leads, replacing "hallucinated links" with audit-ready properties.
+
+---
+
+## 🛠️ The Tech Ecosystem
+- **Frontend Stack**: Next.js 14, Tailwind CSS (Custom Design System), Glassmorphism UI Components.
+- **AI Orchestration**: [Lyzr Agent API](https://lyzr.ai/) (Coordinator Logic).
+- **Vector Core**: [Qdrant Cloud](https://qdrant.tech/) (Persistent Memory & Similarity Mapping).
+- **Real-Time Web Intelligence**: [Apify API](https://apify.com/) (Google Search & Profile Scraper).
+- **Export Pipeline**: Google Sheets Cloud API & Blob-Stream CSV.
+
+---
+
+## 🚀 Deployment Command Center
+
+### 1. Clone & Initialize
 ```bash
+git clone https://github.com/VivekGoudAdula/AstraFlow-AI.git
+cd astraflow-ai
 npm install
 ```
 
-### 3. Environment Variables
-Copy `.env.example` to `.env` and fill in your keys:
+### 2. Configure Your Neural Link (.env)
+You’ll need keys from Lyzr, Qdrant, and Apify.
 ```env
-# Agent Orchestration
-LYZR_API_KEY=your_lyzr_key
+# Lyzr Multi-Agent Key
+LYZR_API_KEY=your_key
 
-# Vector DB
+# Qdrant Vector Cluster
 QDRANT_URL=your_cluster_url
-QDRANT_API_KEY=your_qdrant_key
-QDRANT_COLLECTION_NAME=lyzr_companies
+QDRANT_API_KEY=your_key
+QDRANT_COLLECTION_NAME=astraflow_entities
 
-# Real-time Discovery
-APIFY_API_KEY=your_apify_key
+# Apify Intelligence Key
+APIFY_API_KEY=your_key
 
-# Export integrations
-GOOGLE_SERVICE_ACCOUNT_EMAIL=your_email
-GOOGLE_PRIVATE_KEY="your_private_key"
+# Google Sheets Persistence
+GOOGLE_SERVICE_ACCOUNT_EMAIL=...
+GOOGLE_PRIVATE_KEY="..."
 ```
 
-### 4. Running the Application
-Start the development server:
+### 3. Activate Terminal
 ```bash
 npm run dev
 ```
-Open [http://localhost:3333](http://localhost:3333) with your browser to see the result.
-
-## 🧠 Architecture Flow
-1. **User Input:** User submits a market hypothesis to the UI.
-2. **Phase 1 (Extraction):** The Lyzr Agent scans the internet for relevant news and returns a structured JSON payload of the startup, funding info, and insights on the market shift.
-3. **Phase 2 (Verification):** The Next.js API route (`/api/linkedin`) intercepts the data and executes a secure Apify search to resolve the actual LinkedIn properties.
-4. **Phase 3 (Vector Matching):** The clean payload is upserted to Qdrant. The system then queries the same DB to find semantically related startups previously identified in past scans.
-5. **Insights:** The dashboard populates a cohesive, rich interface of the competitive landscape.
+Navigate to `http://localhost:3333` to begin the scan.
 
 ---
-*Built for the Autonomous Ecosystems Lyzr x Qdrant Hackathon.*
+
+## 📈 System Monitoring
+The application includes a built-in **Agent Status Monitor** that tracks system performance across four key sectors:
+- **Coordinator Sector**: Lyzr logic stability.
+- **Resolution Sector**: Apify profile verification status.
+- **Persistence Sector**: Qdrant memory integrity.
+- **Infrastructure Sector**: Cloud Sheets synchronization status.
+
+---
+
+### *Refining the future of venture intelligence, one vector at a time.*
+Built with ❤️ for the **Autonomous Ecosystems Hackathon**.
